@@ -39,12 +39,12 @@ let assertCalculated (weights:float[]) (numberOfUsers:int) (samplingError:float)
 [<Fact>]
 let ``Use uniform distrubtion with single value``() =
     let calculator = """{"type": "uniform", "args": ["abc"] }""" |> JsonValue.Parse |> ValueDistribution.compile
-    calculator [|"userName", 5|]  |> should equal (JsonValue.String "abc");
+    calculator defaultSha1Provider [|"userName", 5|]  |> should equal (JsonValue.String "abc");
     
 [<Fact>]
 let ``Use weighted distrubtion with single value``() =
     let calculator = """{"type": "weighted","args": {"5": 1} }""" |> JsonValue.Parse |> ValueDistribution.compile
-    calculator [|"userName", 5|]  |> should equal (JsonValue.String "5");
+    calculator defaultSha1Provider [|"userName", 5|]  |> should equal (JsonValue.String "5");
 
 [<Property>]
 let ``Use Bernoulli distribution should equal weighted``() =
@@ -53,8 +53,8 @@ let ``Use Bernoulli distribution should equal weighted``() =
         let q = 1.0-p;
         let weightedInput = (sprintf """{"type": "weighted","args": {"true": %d, "false": %d} }""" (p*100.0 |> int ) (q*100.0 |> int))
         let bernoulliInput = (sprintf """{"type": "bernoulliTrial","args": %.2f }""" p)
-        let calculatorWeighted = weightedInput |> JsonValue.Parse |> ValueDistribution.compile
-        let calculatorBernoulli = bernoulliInput |> JsonValue.Parse |> ValueDistribution.compile
+        let calculatorWeighted = (weightedInput |> JsonValue.Parse |> ValueDistribution.compile) defaultSha1Provider
+        let calculatorBernoulli = (bernoulliInput |> JsonValue.Parse |> ValueDistribution.compile) defaultSha1Provider
         let getValue x = match x with | JsonValue.String "true" -> 1 | JsonValue.String "false" -> 0 | JsonValue.Boolean true -> 1 | JsonValue.Boolean false -> 0 
         let numTests = 1000;
         [|1..numTests|]
@@ -66,7 +66,7 @@ let ``Use Bernoulli distribution should equal weighted``() =
 [<Fact>]
 let ``run single tests and verify similar values``()=
     let weights = [|1.0;5.0;6.0|]
-    let calculatorWeighted = generatedCalculatedScheme weights
+    let calculatorWeighted = (generatedCalculatedScheme weights) defaultSha1Provider
     let totalUsers = 100000
     let samplingError = 0.01
     assertCalculated weights totalUsers samplingError calculatorWeighted
@@ -82,7 +82,7 @@ let ``run many tests and verify similar values``()=
     let samplingError = 0.06
     Prop.forAll gen (fun test -> 
                         let weights = test |> Seq.map float |> Seq.toArray
-                        let calculatorWeighted = generatedCalculatedScheme weights
+                        let calculatorWeighted = (generatedCalculatedScheme weights) defaultSha1Provider
                         assertCalculated weights totalUsers samplingError calculatorWeighted
     )
 
@@ -94,7 +94,7 @@ let ``FF rollout is possible with Bernoulli ``()=
 
     [|1..20|] |> Array.map ((*) 5)
               |> Array.map (fun i-> 
-                    let calc = getCalculator ((float i)/100.0)
+                    let calc = (getCalculator ((float i)/100.0)) defaultSha1Provider
                     users |> Array.filter (fun x-> calc [|x|] = JsonValue.Boolean(true))
               )
               |> Array.pairwise

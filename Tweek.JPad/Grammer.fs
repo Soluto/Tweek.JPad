@@ -34,7 +34,7 @@ module Grammer =
         | SingleVariant of JsonValue
         | MultiVariant  of ValueDistribution
     and ValueDistribution = {
-            HashFunction: (Object[])->JsonValue
+            HashFunction: Sha1Provider -> Object[] -> JsonValue
             OwnerType: Option<string>
             Salt:string
         }

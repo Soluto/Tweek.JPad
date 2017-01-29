@@ -4,7 +4,6 @@ open System.Security;
 open Tweek.JPad.Grammer;
 open System.Text
 open System;
-open PCLCrypto;
 open FSharpUtils.Newtonsoft;
 
 module Matcher = 
@@ -168,10 +167,9 @@ module ValueDistribution =
                               weightedCalc [|(JsonValue.Boolean(true), percentage);(JsonValue.Boolean(false), (100 - percentage))|];
         | s -> raise (Exception("expected operator, found:"+s));
         
-        (fun (units : Object[])-> 
-            let sha1 = PCLCrypto.WinRTCrypto.HashAlgorithmProvider.OpenAlgorithm(HashAlgorithm.Sha1)
+        (fun (sha1Provider:Sha1Provider) (units : Object[])-> 
             let input = units |> Seq.map string |>  String.concat "."
-            let hash = BitConverter.ToUInt64(((sha1.HashData (Encoding.UTF8.GetBytes input)).[0..15]), 0)
+            let hash = BitConverter.ToUInt64(((sha1Provider (Encoding.UTF8.GetBytes input)).[0..15]), 0)
             fn(hash))
     
 module Rule = 
@@ -191,10 +189,12 @@ module Rule =
 
     let buildEvaluator (settings:ParserSettings) (rule : (MatcherExpression * RuleValue)) : JPadEvaluate =
         let matcher = Matcher.createEvaluator settings (fst rule);
-        let validateMatcher context = if (matcher context) then Some(context) else None; 
+        let validateMatcher context = if (matcher context) then Some(context) else None;  
         match (snd rule) with
             |SingleVariant value -> validateMatcher >> Option.map (fun _ -> value);
-            |MultiVariant valueDistribution -> validateMatcher >> Option.bind (fun context->
+            |MultiVariant valueDistribution -> 
+                let hash = valueDistribution.HashFunction settings.Sha1Provider
+                validateMatcher >> Option.bind (fun context->
                 let opOwner = valueDistribution.OwnerType |> Option.map (fun owner -> owner + ".@@id") |> Option.bind context;
-                opOwner |> Option.map (fun s-> s.AsString()) |> Option.map (fun owner -> valueDistribution.HashFunction [|owner :> Object;valueDistribution.Salt :> Object|])
+                opOwner |> Option.map (fun s-> s.AsString()) |> Option.map (fun owner -> hash [|owner :> Object;valueDistribution.Salt :> Object|])
             )
