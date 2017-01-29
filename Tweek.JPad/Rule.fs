@@ -169,7 +169,7 @@ module ValueDistribution =
         
         (fun (sha1Provider:Sha1Provider) (units : Object[])-> 
             let input = units |> Seq.map string |>  String.concat "."
-            let hash = BitConverter.ToUInt64(((sha1Provider (Encoding.UTF8.GetBytes input)).[0..15]), 0)
+            let hash = BitConverter.ToUInt64(((sha1Provider.Invoke (Encoding.UTF8.GetBytes input)).[0..15]), 0)
             fn(hash))
     
 module Rule = 
