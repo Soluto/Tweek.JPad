@@ -7,6 +7,7 @@ module Grammer =
     type JPad = {
         Partitions:Partitions
         Rules: RulesContainer
+        ValueType: string
     }
     and Partitions = string[]
     and RulesContainer = 
@@ -34,10 +35,14 @@ module Grammer =
         | SingleVariant of JsonValue
         | MultiVariant  of ValueDistribution
     and ValueDistribution = {
-            HashFunction: Sha1Provider -> Object[] -> JsonValue
+            DistributionType: DistributionType
             OwnerType: Option<string>
             Salt:string
         }
+    and DistributionType = 
+        | Uniform  of JsonValue[]
+        | Weighted of (JsonValue * int)[]
+        | Bernouli of float
     and PropertyName = string
     and ConjuctionOp = And | Or 
     and CompareOp = Equal | GreaterThan | LessThan | GreaterEqual | LessEqual | NotEqual 

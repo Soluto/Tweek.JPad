@@ -156,16 +156,24 @@ module ValueDistribution =
 
     let floatToWeighted = (*) 100.0 >> int
 
-    let compile (schema:JsonValue) =
-        let fn = match schema.GetProperty("type").AsString() with
-        | "uniform" ->  schema.GetProperty("args").AsArray() |> uniformCalc;
-        | "weighted" ->  let weightedValues = match schema.GetProperty("args") with  
-                             | JsonValue.Array r -> r |> Array.map (fun(item) -> (item.["value"], item.["weight"].AsInteger()))
-                             | JsonValue.Record r -> r |> Array.map (fun (k,v)-> (JsonValue.String(k), v.AsInteger()))
-                         weightedCalc weightedValues
-        | "bernoulliTrial" -> let percentage = schema.GetProperty("args").AsFloat() |>floatToWeighted
-                              weightedCalc [|(JsonValue.Boolean(true), percentage);(JsonValue.Boolean(false), (100 - percentage))|];
-        | s -> raise (Exception("expected operator, found:"+s));
+    let parseValueWithValueType (valueType:string) (value:string)= match valueType with
+        | "boolean" -> JsonValue.Boolean (value |> bool.Parse);
+        | "number" -> JsonValue.Number (value |> decimal);
+        |  _ -> JsonValue.String value;
+
+    let parseValueDistribution (args:JsonValue) (valueType:string)  distributionType = match distributionType with
+        | "uniform" -> DistributionType.Uniform (args.AsArray())
+        | "bernoulliTrial" -> DistributionType.Bernouli (args.AsFloat())
+        | "weighted" -> DistributionType.Weighted (args.Properties() |> Array.map (fun (k,v)-> (parseValueWithValueType valueType k, v.AsInteger())))
+
+    let parse valueType (jsonRule:JsonValue) = jsonRule.["type"] |> JsonExtensions.AsString |> (parseValueDistribution jsonRule.["args"] valueType)
+
+    let compile (distributionType:DistributionType) =
+        let fn = match distributionType with
+        | Uniform array ->  array |> uniformCalc;
+        | Weighted weightedValues ->  weightedCalc weightedValues
+        | Bernouli ratio ->  let percentage = ratio |>floatToWeighted
+                             weightedCalc [|(JsonValue.Boolean(true), percentage);(JsonValue.Boolean(false), (100 - percentage))|];
         
         (fun (sha1Provider:Sha1Provider) (units : Object[])-> 
             let input = units |> Seq.map string |>  String.concat "."
@@ -173,18 +181,16 @@ module ValueDistribution =
             fn(hash))
     
 module Rule = 
-    let parse (jsonRule:JsonValue) = 
+    let parse valueType (jsonRule:JsonValue) = 
         let matcher = jsonRule.["Matcher"] |> Matcher.parse;
         let value = match jsonRule.["Type"].AsString() with
                             | "SingleVariant" -> RuleValue.SingleVariant(jsonRule.["Value"])
-                            | "MultiVariant" ->  
-                                RuleValue.MultiVariant({
-                                                        HashFunction = jsonRule.["ValueDistribution"] |> ValueDistribution.compile;
-                                                        OwnerType = jsonRule.TryGetProperty("OwnerType") |> Option.map JsonExtensions.AsString
-                                                        Salt = jsonRule.["Id"].AsString()
-                                                        })
+                            | "MultiVariant" -> RuleValue.MultiVariant({
+                                DistributionType = ValueDistribution.parse valueType jsonRule.["ValueDistribution"] 
+                                OwnerType = jsonRule.TryGetProperty("OwnerType") |> Option.map JsonExtensions.AsString
+                                Salt = jsonRule.["Id"].AsString()
+                                })
                             | _ -> raise (ParseError("not supported value distrubtion"))
-
         (matcher, value)
 
     let buildEvaluator (settings:ParserSettings) (rule : (MatcherExpression * RuleValue)) : JPadEvaluate =
@@ -193,8 +199,10 @@ module Rule =
         match (snd rule) with
             |SingleVariant value -> validateMatcher >> Option.map (fun _ -> value);
             |MultiVariant valueDistribution -> 
-                let hash = valueDistribution.HashFunction settings.Sha1Provider
+                let hashFunction = ValueDistribution.compile valueDistribution.DistributionType;
+                let hash = hashFunction settings.Sha1Provider
                 validateMatcher >> Option.bind (fun context->
                 let opOwner = valueDistribution.OwnerType |> Option.map (fun owner -> owner + ".@@id") |> Option.bind context;
                 opOwner |> Option.map (fun s-> s.AsString()) |> Option.map (fun owner -> hash [|owner :> Object;valueDistribution.Salt :> Object|])
             )
+
