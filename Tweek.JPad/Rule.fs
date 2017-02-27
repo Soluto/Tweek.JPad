@@ -27,6 +27,7 @@ module Matcher =
         |"$lt" -> Op.CompareOp(CompareOp.LessThan)
         |"$ne" -> Op.CompareOp(CompareOp.NotEqual)
         |"$in" -> Op.ArrayOp(ArrayOp.In)
+        |"$withinTime" -> Op.TimeOp(TimeOp.WithinTime)
         | s -> raise (ParseError("expected operator, found:"+s))
 
     let private evaluateComparisonOp = function 
@@ -77,6 +78,40 @@ module Matcher =
                             | _ , _ , _ -> Exception("non matching types") |> raise
                         )
 
+    let private (|Suffix|_|) (p:string) (s:string) =
+        if s.EndsWith(p) then
+            Some(s.Substring(0, s.Length - p.Length))
+        else
+            None
+
+    let private parseTimeUnit (value:string) = 
+        match value with
+        | Suffix "s" unitValue -> unitValue |> float |> TimeSpan.FromSeconds
+        | Suffix "m" unitValue -> unitValue |> float |> TimeSpan.FromMinutes
+        | Suffix "h" unitValue -> unitValue |> float |> TimeSpan.FromHours
+        | Suffix "d" unitValue -> unitValue |> float |> TimeSpan.FromDays
+        | _ -> Exception("Invalid time unit") |> raise
+
+    let private parseTime (valueOption:Option<JsonValue>) = 
+        match valueOption with
+        | None -> None
+        | Some value -> 
+            match value with
+            | JsonValue.String stringValue -> stringValue |> DateTime.Parse |> Some
+            | _ -> Exception("Invalid time format") |> raise
+
+    let private evaluateTimeComparison (prefix) (op: TimeOp) (leftValue:ComparisonValue) =
+        match (op) with 
+            | TimeOp.WithinTime -> 
+                let timespan = parseTimeUnit (leftValue.AsString())
+                (fun (context:Context) -> 
+                    let systemTime = parseTime(context("system.time_utc"))
+                    let fieldValueOption = parseTime(context(prefix))
+                    match (systemTime, fieldValueOption) with
+                    | _, None -> false
+                    | None, _ -> Exception("Missing system time details") |> raise
+                    | Some now, Some fieldValue -> (now - fieldValue).Duration() < timespan)
+
     let private evaluateArrayTest (comparer) (op: ArrayOp) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
         match jsonValue with
             | JsonValue.Array arr -> match op with
@@ -96,6 +131,7 @@ module Matcher =
                     |KeyProperty-> MatcherExpression.Property(key, innerSchema |> parsePropertySchema ConjuctionOp.And)
                     |Op-> match parseOp(key) with
                         | Op.CompareOp compareOp -> MatcherExpression.Compare (compareOp, innerSchema)
+                        | Op.TimeOp timeOp -> MatcherExpression.TimeCompare (timeOp, innerSchema)
                         | Op.ArrayOp arrayOp -> MatcherExpression.ArrayTest (arrayOp, innerSchema)
                         | Op.ConjuctionOp binaryOp-> match binaryOp with
                             | ConjuctionOp.And -> innerSchema |> parsePropertySchema ConjuctionOp.And
@@ -125,6 +161,8 @@ module Matcher =
                     (|>) prefix >> evaluateArrayTest comparer op op_value  
                 | Compare (op, op_value) ->  
                     (|>) prefix >> evaluateComparison comparer op op_value
+                | TimeCompare (op, op_value) ->  
+                    evaluateTimeComparison prefix op op_value
                 | SwitchComparer (newComparer, innerexp) -> match getComparer(newComparer) with
                     | Some inst_comparer -> innerexp|> CompileExpression prefix (createComparer(inst_comparer.Invoke))
                     | None -> ParseError ("missing comparer - " + newComparer) |> raise

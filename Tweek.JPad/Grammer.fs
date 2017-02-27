@@ -28,6 +28,7 @@ module Grammer =
             | Not of MatcherExpression
             | Binary of ConjuctionOp * MatcherExpression * MatcherExpression
             | Compare of CompareOp * ComparisonValue
+            | TimeCompare of TimeOp * ComparisonValue
             | ArrayTest of ArrayOp * ComparisonValue
             | SwitchComparer of string * MatcherExpression
             | Empty
@@ -46,10 +47,12 @@ module Grammer =
     and PropertyName = string
     and ConjuctionOp = And | Or 
     and CompareOp = Equal | GreaterThan | LessThan | GreaterEqual | LessEqual | NotEqual 
+    and TimeOp = WithinTime
     and Op = 
         | CompareOp of CompareOp
         | ConjuctionOp of ConjuctionOp
         | ArrayOp of ArrayOp
+        | TimeOp of TimeOp
         | Not
     and UnaryOp = Not
     and ArrayOp = In
