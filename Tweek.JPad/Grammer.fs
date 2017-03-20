@@ -8,6 +8,7 @@ module Grammer =
         Partitions:Partitions
         Rules: RulesContainer
         ValueType: string
+        DefaultValue: JsonValue option
     }
     and Partitions = string[]
     and RulesContainer = 

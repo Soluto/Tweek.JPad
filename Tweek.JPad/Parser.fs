@@ -39,15 +39,17 @@ type public JPadParser(settings:ParserSettings) =
             let partitions = (json.GetProperty "partitions") |> JsonExtensions.AsArray |> Array.map JsonExtensions.AsString;
             let rules = (json.GetProperty "rules");
             let valueType = defaultArg (json.TryGetProperty "valueType" |> Option.map JsonExtensions.AsString) "string"
+            let defaultValue = json.TryGetProperty "defaultValue"
 
             { Partitions = partitions;
               Rules = parseRulesContainer partitions.Length rules valueType
               ValueType = valueType
+              DefaultValue = defaultValue
               } 
         | JsonValue.Array jpad1rules -> jpad1rules |> List.ofArray |>
                                         List.map (Rule.parse "string") |>
                                         RulesContainer.RulesList |>
-                                        (fun rules->{Partitions = [||]; Rules = rules; ValueType = "string"})
+                                        (fun rules->{Partitions = [||]; Rules = rules; ValueType = "string"; DefaultValue = None})
     //--
 
     //evaluating
@@ -75,7 +77,8 @@ type public JPadParser(settings:ParserSettings) =
     //api
     let buildEvaluator (jpad:JPad) :JPadEvaluateExt =
         createRuleContainerEvaluator (jpad.Partitions |> List.ofArray) jpad.Rules |>
-        (fun evaluator -> JPadEvaluateExt(fun context -> evaluator context.Invoke))
+        (fun evaluator -> JPadEvaluateExt(fun context -> let result = evaluator context.Invoke
+                                                         if result.IsSome then result else jpad.DefaultValue ))
     
     member public this.Parse : (string -> JPadEvaluateExt) = 
         JsonValue.Parse >>
