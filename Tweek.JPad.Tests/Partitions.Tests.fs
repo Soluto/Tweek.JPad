@@ -11,7 +11,7 @@ open Tweek.JPad
 open FsCheck
 open System
 
-let parser = JPadParser(ParserSettings())
+let parser = JPadParser(ParserSettings(dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))])))
 let createContext seq = ContextDelegate(fun name -> seq |> Seq.tryFind (fun (k,v)->k = name) |> Option.map (fun (k,v)->JsonValue.String v))
 let validate (rules:JPadEvaluateExt) context value = rules.Invoke context |> should equal (Some(JsonValue.String value))
 
@@ -35,6 +35,28 @@ let ``Use partitions with simple values``() =
     validate rules (createContext [("fruit", "banana")]) "yellow"
     validate rules (createContext [("fruit", "grapes")]) "unknown"
     validate rules (createContext []) "unknown"
+
+[<Fact>]
+let ``Use partitions with invalid rules``() =
+    let invalidJPad = """
+    {
+	    "partitions": ["fruit", "cultivar"],
+	    "rules":{
+		    "apple": {
+			    "*": [{
+                    "Matcher":{
+                        "device.Version": {
+                            "$compare":"version",
+                            "$ge": "abcd"
+                        }
+                    },
+                    "Type":"SingleVariant",
+                    "Value": "abcd"
+                }]
+		    }
+	    }
+    }"""
+    (fun () -> (parser.Parse invalidJPad) |> ignore) |> should throw typeof<ParseError>
 
 [<Fact>]
 let ``Use partitions with full rules``() =

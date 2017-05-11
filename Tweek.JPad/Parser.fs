@@ -48,26 +48,31 @@ type public JPadParser(settings:ParserSettings) =
                                         (fun rules->{Partitions = [||]; Rules=  rules})
     //--
 
+    let extractPartitionValue partitionType (context:Context) = 
+        defaultArg ((context partitionType) |> Option.map JsonExtensions.AsString) "*"
+
     //evaluating
     let rec createRuleContainerEvaluator (partitions:List<string>) (rulesContainer:RulesContainer)  : JPadEvaluate =
         match rulesContainer, partitions with
-                |RulesByPartition rules, (partitionType :: nextPartitions) -> (fun (ctx:Context)->
-                    let partitionValue = ctx partitionType
-                    let childContainer = rules |> Seq.ofArray |> 
-                                                  seqFirstMatch (fun block -> evaluatePatternBlock block partitionValue)
+                |RulesByPartition rules, (partitionType :: otherPartitions) ->  
+                    let compiledBlocks = rules |> Array.map (evaluatePatternBlock otherPartitions)
+                    let partitionExtractor = extractPartitionValue partitionType
                     
-                    childContainer |> Option.bind (fun child -> ctx |> (createRuleContainerEvaluator nextPartitions child))
-                    )
+                    (fun context -> 
+                        let partitionValue = context |> partitionExtractor
+                        compiledBlocks |> seqFirstMatch (fun block -> block partitionValue context))
+
                 |RulesList rules, [] -> 
                     let rulesFns = rules |> List.map (Rule.buildEvaluator settings);
                     (fun context-> rulesFns |> seqFirstMatch (fun rule -> rule context))
                                                 
     
-     and evaluatePatternBlock block contextValue =
-        match block, contextValue with
-            |Map map, Some value ->  map.TryFind(value.AsString().ToLower());
-            |Map map, None -> None;
-            |PatternBlock.Default container, _ -> Some(container);
+     and evaluatePatternBlock partitions block : (string)->JPadEvaluate  =
+        match block with
+            |Map map ->  let compiledMap = map |> Map.map (fun _ fn -> createRuleContainerEvaluator partitions fn)
+                         (fun partitionValue -> defaultArg (compiledMap |> Map.tryFind (partitionValue.ToLower())) (fun _->None) )
+            |PatternBlock.Default container -> let fn = createRuleContainerEvaluator partitions container
+                                               (fun partitionValue -> fn)
     //--
     
     //api
