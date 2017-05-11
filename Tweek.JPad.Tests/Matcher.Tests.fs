@@ -172,3 +172,30 @@ let ``Compare to null value with not equal operator``() =
 let ``Compare incompatible values``() =
     let validate = validator """{"Age": 30}"""
     (fun () -> validate (context [("Age", JsonValue.Boolean(false));]) |> ignore) |> should throw typeof<Exception>
+    
+[<Fact>]
+let ``DateCompare using withinTime with days``() =
+    let validate = validator """{"Birthday": {"$withinTime": "10d"}}"""
+    validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddDays(-20.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal false
+    validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddDays(-5.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal true
+    validate (context [])  |> should equal false
+
+[<Fact>]
+let ``DateCompare using withinTime with hours``() =
+    let validate = validator """{"Birthday": {"$withinTime": "10h"}}"""
+    validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddHours(-20.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal false
+    validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddHours(-5.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal true
+    validate (context [])  |> should equal false
+
+[<Fact>]
+let ``DateCompare using withinTime with minutes``() =
+    let validate = validator """{"Birthday": {"$withinTime": "10m"}}"""
+    validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddMinutes(-20.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal false
+    validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddMinutes(-5.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal true
+    validate (context [])  |> should equal false
+
+[<Fact>]
+let ``DateCompare using withinTime with invalid time unit format``() =
+    (fun () -> validator """{"Birthday": {"$withinTime": "10z"}}""" |> ignore) |> should throw typeof<Exception>
+    (fun () -> validator """{"Birthday": {"$withinTime": null}}""" |> ignore) |> should throw typeof<Exception>
+    (fun () -> validator """{"Birthday": {"$withinTime": "a long long time ago"}}""" |> ignore) |> should throw typeof<Exception>

@@ -27,6 +27,7 @@ module Matcher =
         |"$lt" -> Op.CompareOp(CompareOp.LessThan)
         |"$ne" -> Op.CompareOp(CompareOp.NotEqual)
         |"$in" -> Op.ArrayOp(ArrayOp.In)
+        |"$withinTime" -> Op.TimeOp(TimeOp.WithinTime)
         | s -> raise (ParseError("expected operator, found:"+s))
 
     let inline evaluateComparisonOp op a b = match op with
@@ -77,6 +78,40 @@ module Matcher =
                             | _ , _ , _ -> Exception("non matching types") |> raise
                         )
 
+    let private (|Suffix|_|) (p:string) (s:string) =
+        if s.EndsWith(p) then
+            Some(s.Substring(0, s.Length - p.Length))
+        else
+            None
+
+    let private parseTimeUnit (value:string) = 
+        match value with
+        | Suffix "s" unitValue -> unitValue |> float |> TimeSpan.FromSeconds
+        | Suffix "m" unitValue -> unitValue |> float |> TimeSpan.FromMinutes
+        | Suffix "h" unitValue -> unitValue |> float |> TimeSpan.FromHours
+        | Suffix "d" unitValue -> unitValue |> float |> TimeSpan.FromDays
+        | _ -> Exception("Invalid time unit") |> raise
+
+    let private parseTime (valueOption:Option<JsonValue>) = 
+        match valueOption with
+        | None -> None
+        | Some value -> 
+            match value with
+            | JsonValue.String stringValue -> stringValue |> DateTime.Parse |> Some
+            | _ -> Exception("Invalid time format") |> raise
+
+    let private evaluateTimeComparison (prefix) (op: TimeOp) (leftValue:ComparisonValue) =
+        match (op) with 
+            | TimeOp.WithinTime -> 
+                let timespan = parseTimeUnit (leftValue.AsString())
+                (fun (context:Context) -> 
+                    let systemTime = parseTime(context("system.time_utc"))
+                    let fieldValueOption = parseTime(context(prefix))
+                    match (systemTime, fieldValueOption) with
+                    | _, None -> false
+                    | None, _ -> Exception("Missing system time details") |> raise
+                    | Some now, Some fieldValue -> (now - fieldValue).Duration() < timespan)
+
     let private evaluateArrayTest (comparer) (op: ArrayOp) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
         match jsonValue with
             | JsonValue.Array arr -> match op with
@@ -96,6 +131,7 @@ module Matcher =
                     |KeyProperty-> MatcherExpression.Property(key, innerSchema |> parsePropertySchema ConjuctionOp.And)
                     |Op-> match parseOp(key) with
                         | Op.CompareOp compareOp -> MatcherExpression.Compare (compareOp, innerSchema)
+                        | Op.TimeOp timeOp -> MatcherExpression.TimeCompare (timeOp, innerSchema)
                         | Op.ArrayOp arrayOp -> MatcherExpression.ArrayTest (arrayOp, innerSchema)
                         | Op.ConjuctionOp binaryOp-> match binaryOp with
                             | ConjuctionOp.And -> innerSchema |> parsePropertySchema ConjuctionOp.And
@@ -125,6 +161,8 @@ module Matcher =
                     (|>) prefix >> evaluateArrayTest comparer op op_value  
                 | Compare (op, op_value) ->  
                     (|>) prefix >> evaluateComparison comparer op op_value
+                | TimeCompare (op, op_value) ->  
+                    evaluateTimeComparison prefix op op_value
                 | SwitchComparer (newComparer, innerexp) -> match getComparer(newComparer) with
                     | Some inst_comparer -> innerexp|> CompileExpression prefix (createComparer(inst_comparer.Invoke))
                     | None -> ParseError ("missing comparer - " + newComparer) |> raise
@@ -156,16 +194,24 @@ module ValueDistribution =
 
     let floatToWeighted = (*) 100.0 >> int
 
-    let compile (schema:JsonValue) =
-        let fn = match schema.GetProperty("type").AsString() with
-        | "uniform" ->  schema.GetProperty("args").AsArray() |> uniformCalc;
-        | "weighted" ->  let weightedValues = match schema.GetProperty("args") with  
-                             | JsonValue.Array r -> r |> Array.map (fun(item) -> (item.["value"], item.["weight"].AsInteger()))
-                             | JsonValue.Record r -> r |> Array.map (fun (k,v)-> (JsonValue.String(k), v.AsInteger()))
-                         weightedCalc weightedValues
-        | "bernoulliTrial" -> let percentage = schema.GetProperty("args").AsFloat() |>floatToWeighted
-                              weightedCalc [|(JsonValue.Boolean(true), percentage);(JsonValue.Boolean(false), (100 - percentage))|];
-        | s -> raise (Exception("expected operator, found:"+s));
+    let parseValueWithValueType (valueType:string) (value:string)= match valueType with
+        | "boolean" -> JsonValue.Boolean (value |> bool.Parse);
+        | "number" -> JsonValue.Number (value |> decimal);
+        |  _ -> JsonValue.String value;
+
+    let parseValueDistribution (args:JsonValue) (valueType:string)  distributionType = match distributionType with
+        | "uniform" -> DistributionType.Uniform (args.AsArray())
+        | "bernoulliTrial" -> DistributionType.Bernouli (args.AsFloat())
+        | "weighted" -> DistributionType.Weighted (args.Properties() |> Array.map (fun (k,v)-> (parseValueWithValueType valueType k, v.AsInteger())))
+
+    let parse valueType (jsonRule:JsonValue) = jsonRule.["type"] |> JsonExtensions.AsString |> (parseValueDistribution jsonRule.["args"] valueType)
+
+    let compile (distributionType:DistributionType) =
+        let fn = match distributionType with
+        | Uniform array ->  array |> uniformCalc;
+        | Weighted weightedValues ->  weightedCalc weightedValues
+        | Bernouli ratio ->  let percentage = ratio |>floatToWeighted
+                             weightedCalc [|(JsonValue.Boolean(true), percentage);(JsonValue.Boolean(false), (100 - percentage))|];
         
         (fun (sha1Provider:Sha1Provider) (units : Object[])-> 
             let input = units |> Seq.map string |>  String.concat "."
@@ -173,18 +219,16 @@ module ValueDistribution =
             fn(hash))
     
 module Rule = 
-    let parse (jsonRule:JsonValue) = 
+    let parse valueType (jsonRule:JsonValue) = 
         let matcher = jsonRule.["Matcher"] |> Matcher.parse;
         let value = match jsonRule.["Type"].AsString() with
                             | "SingleVariant" -> RuleValue.SingleVariant(jsonRule.["Value"])
-                            | "MultiVariant" ->  
-                                RuleValue.MultiVariant({
-                                                        HashFunction = jsonRule.["ValueDistribution"] |> ValueDistribution.compile;
-                                                        OwnerType = jsonRule.TryGetProperty("OwnerType") |> Option.map JsonExtensions.AsString
-                                                        Salt = jsonRule.["Id"].AsString()
-                                                        })
+                            | "MultiVariant" -> RuleValue.MultiVariant({
+                                DistributionType = ValueDistribution.parse valueType jsonRule.["ValueDistribution"] 
+                                OwnerType = jsonRule.TryGetProperty("OwnerType") |> Option.map JsonExtensions.AsString
+                                Salt = jsonRule.["Id"].AsString()
+                                })
                             | _ -> raise (ParseError("not supported value distrubtion"))
-
         (matcher, value)
 
     let buildEvaluator (settings:ParserSettings) (rule : (MatcherExpression * RuleValue)) : JPadEvaluate =
@@ -193,8 +237,10 @@ module Rule =
         match (snd rule) with
             |SingleVariant value -> validateMatcher >> Option.map (fun _ -> value);
             |MultiVariant valueDistribution -> 
-                let hash = valueDistribution.HashFunction settings.Sha1Provider
+                let hashFunction = ValueDistribution.compile valueDistribution.DistributionType;
+                let hash = hashFunction settings.Sha1Provider
                 validateMatcher >> Option.bind (fun context->
                 let opOwner = valueDistribution.OwnerType |> Option.map (fun owner -> owner + ".@@id") |> Option.bind context;
                 opOwner |> Option.map (fun s-> s.AsString()) |> Option.map (fun owner -> hash [|owner :> Object;valueDistribution.Salt :> Object|])
             )
+
