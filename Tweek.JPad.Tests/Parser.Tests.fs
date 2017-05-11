@@ -171,3 +171,25 @@ let ``Use full rules without default value``() =
     validateValue rules (createContext [("fruit", "banana")]) "yellow"
     validateNone rules (createContext [("fruit", "grapes")])
     validateNone rules (createContext [])
+
+[<Fact>]
+let ``Use partitioned key with invalid rules``() =
+let invalidJPad = """
+{
+    "partitions": ["fruit", "cultivar"],
+    "rules":{
+	    "apple": {
+		    "*": [{
+                "Matcher":{
+                    "device.Version": {
+                        "$compare":"version",
+                        "$ge": "abcd"
+                    }
+                },
+                "Type":"SingleVariant",
+                "Value": "abcd"
+            }]
+	    }
+    }
+}"""
+(fun () -> (parser.Parse invalidJPad) |> ignore) |> should throw typeof<ParseError>

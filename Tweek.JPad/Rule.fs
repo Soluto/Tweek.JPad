@@ -30,13 +30,13 @@ module Matcher =
         |"$withinTime" -> Op.TimeOp(TimeOp.WithinTime)
         | s -> raise (ParseError("expected operator, found:"+s))
 
-    let private evaluateComparisonOp = function 
-                    | CompareOp.Equal -> (fun b a -> a = b)
-                    | CompareOp.GreaterThan -> (fun b a -> a > b)
-                    | CompareOp.LessThan -> (fun b a -> a < b)
-                    | CompareOp.GreaterEqual -> (fun b a -> a >= b)
-                    | CompareOp.LessEqual -> (fun b a -> a <= b)
-                    | CompareOp.NotEqual -> (fun b a -> a <> b)
+    let inline evaluateComparisonOp op a b = match op with
+                    | CompareOp.Equal -> a = b
+                    | CompareOp.GreaterThan -> a < b
+                    | CompareOp.LessThan -> a > b
+                    | CompareOp.GreaterEqual ->  a <= b
+                    | CompareOp.LessEqual -> a >= b
+                    | CompareOp.NotEqual -> a <> b
 
     type private comparer = (JsonValue)->(JsonValue)->int
 
