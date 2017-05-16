@@ -54,6 +54,7 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
+    <Compile Include="Common.fs" />
     <Compile Include="ValueDistributor.Tests.fs" />
     <Content Include="packages.config" />
     <Content Include="app.config" />

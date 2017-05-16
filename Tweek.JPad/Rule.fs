@@ -1,8 +1,9 @@
 ﻿namespace Tweek.JPad
 open FSharp.Data;
 open System.Security;
-open Tweek.JPad.Grammer;
-open System.Text
+open Tweek.JPad.AST;
+open System.Text;
+open System.Text.RegularExpressions;
 open System;
 open FSharpUtils.Newtonsoft;
 
@@ -20,14 +21,17 @@ module Matcher =
         |"$not" -> Op.Not
         |"$or" -> Op.ConjuctionOp(ConjuctionOp.Or)
         |"$and" -> Op.ConjuctionOp(ConjuctionOp.And)
-        |"$ge" -> Op.CompareOp(CompareOp.GreaterEqual)
-        |"$eq" -> Op.CompareOp(CompareOp.Equal)
-        |"$gt" -> Op.CompareOp(CompareOp.GreaterThan)
-        |"$le" -> Op.CompareOp(CompareOp.LessEqual)
-        |"$lt" -> Op.CompareOp(CompareOp.LessThan)
-        |"$ne" -> Op.CompareOp(CompareOp.NotEqual)
-        |"$in" -> Op.ArrayOp(ArrayOp.In)
-        |"$withinTime" -> Op.TimeOp(TimeOp.WithinTime)
+        |"$ge" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.GreaterEqual))
+        |"$eq" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.Equal))
+        |"$gt" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.GreaterThan))
+        |"$le" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.LessEqual))
+        |"$lt" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.LessThan))
+        |"$ne" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.NotEqual))
+        |"$in" -> Op.BinaryOp(BinaryOp.In)
+        |"$contains" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.Contains))
+        |"$startsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.StartsWith))
+        |"$endsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.EndsWith))
+        |"$withinTime" -> Op.BinaryOp(BinaryOp.TimeOp(TimeOp.WithinTime))
         | s -> raise (ParseError("expected operator, found:"+s))
 
     let inline evaluateComparisonOp op a b = match op with
@@ -100,7 +104,7 @@ module Matcher =
             | JsonValue.String stringValue -> stringValue |> DateTime.Parse |> Some
             | _ -> Exception("Invalid time format") |> raise
 
-    let private evaluateTimeComparison (prefix) (op: TimeOp) (leftValue:ComparisonValue) =
+    let private evaluateTimeComparison (prefix) (op: TimeOp) (leftValue:ComparisonValue)  =
         match (op) with 
             | TimeOp.WithinTime -> 
                 let timespan = parseTimeUnit (leftValue.AsString())
@@ -112,66 +116,78 @@ module Matcher =
                     | None, _ -> Exception("Missing system time details") |> raise
                     | Some now, Some fieldValue -> (now - fieldValue).Duration() < timespan)
 
-    let private evaluateArrayTest (comparer) (op: ArrayOp) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
+    let falseOnNone fn opt = match opt with |Some v -> if v = null then false else fn v 
+                                            |None -> false
+
+    let private evaluateStringComparison (op: StringOp) (leftValue:string) =
+        let casedValue = leftValue.ToLower
+        match (op) with
+            | StringOp.Contains -> (fun (s:string) ->s.ToLower().Contains leftValue ) |> falseOnNone
+            | StringOp.StartsWith -> (fun (s:string) ->s.ToLower().StartsWith leftValue ) |> falseOnNone
+            | StringOp.EndsWith -> (fun (s:string) ->s.ToLower().EndsWith leftValue ) |> falseOnNone
+
+    let private evaluateInArray (comparer) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
         match jsonValue with
-            | JsonValue.Array arr -> match op with
-                | ArrayOp.In ->  
+            | JsonValue.Array arr -> 
                 let compareItem = evaluateComparison comparer CompareOp.Equal
                 (fun contextValue -> arr |> Array.exists (fun item-> compareItem item contextValue ))
             | _ -> (fun _->false)
 
-    let rec private parsePropertySchema (conjuctionOp : ConjuctionOp) (schema:JsonValue)  : MatcherExpression = 
+    let rec private parsePropertySchema (conjuctionOp : ConjuctionOp)  (comparisonType:ComparisonType) (schema:JsonValue)  : MatcherExpression = 
         match schema with 
         | JsonValue.Record record -> 
             let converterType = record |> Seq.tryFind (fst >> (=) "$compare")
             let filter = (match converterType with |None -> id |Some x -> Seq.filter ((<>) x) )
-            let props = record |> 
+            let newComparisonType = match converterType with 
+                                        |Some (_, convertType) -> ComparisonType.Custom (convertType |> JsonExtensions.AsString)
+                                        |None -> comparisonType
+            record |> 
                 filter |>
                 Seq.map (fun (key,innerSchema)-> match key with 
-                    |KeyProperty-> MatcherExpression.Property(key, innerSchema |> parsePropertySchema ConjuctionOp.And)
+                    |KeyProperty-> MatcherExpression.Property(key, innerSchema |> parsePropertySchema ConjuctionOp.And newComparisonType)
                     |Op-> match parseOp(key) with
-                        | Op.CompareOp compareOp -> MatcherExpression.Compare (compareOp, innerSchema)
-                        | Op.TimeOp timeOp -> MatcherExpression.TimeCompare (timeOp, innerSchema)
-                        | Op.ArrayOp arrayOp -> MatcherExpression.ArrayTest (arrayOp, innerSchema)
-                        | Op.ConjuctionOp binaryOp-> match binaryOp with
-                            | ConjuctionOp.And -> innerSchema |> parsePropertySchema ConjuctionOp.And
-                            | ConjuctionOp.Or  -> innerSchema |> parsePropertySchema ConjuctionOp.Or
-                        | Op.Not  -> MatcherExpression.Not(innerSchema |> parsePropertySchema ConjuctionOp.And)
-                ) |> reduceOrElse (fun acc exp-> MatcherExpression.Binary(conjuctionOp, acc, exp)) MatcherExpression.Empty
-            match converterType with 
-                |Some (_, convertType) -> MatcherExpression.SwitchComparer( convertType.AsString(), props)
-                |None -> props
-        | x -> MatcherExpression.Compare(CompareOp.Equal, x)
+                        | Op.BinaryOp op -> MatcherExpression.Binary (op, newComparisonType, innerSchema)
+                        | Op.ConjuctionOp op-> match op with
+                            | ConjuctionOp.And -> innerSchema |> parsePropertySchema ConjuctionOp.And newComparisonType
+                            | ConjuctionOp.Or  -> innerSchema |> parsePropertySchema ConjuctionOp.Or newComparisonType
+                        | Op.Not  -> MatcherExpression.Not(innerSchema |> parsePropertySchema ConjuctionOp.And newComparisonType)
+                ) |> reduceOrElse (fun acc exp-> MatcherExpression.Conjuction(conjuctionOp, acc, exp)) MatcherExpression.Empty
+        | x -> MatcherExpression.Binary(BinaryOp.CompareOp(CompareOp.Equal), comparisonType,  x)
 
     let getPropName prefix prop = if prefix = "" then prop else (prefix + "." + prop)
 
+
+
     let private compile_internal (comparers:System.Collections.Generic.IDictionary<string,ComparerDelegate>) exp  = 
-        let getComparer s = if comparers.ContainsKey(s) then Some comparers.[s] else None;
-        let rec CompileExpression (prefix:string) comparer (exp: MatcherExpression)  : (Context) -> bool =
+        let defaultComparer (l:string) (r:string) = l.ToLower().CompareTo (r.ToLower())
+        let getComparer comparisonType = match comparisonType with
+                                         | Auto -> defaultComparer
+                                         | Custom s -> if comparers.ContainsKey(s) then createComparer(comparers.[s].Invoke) else ParseError("missing comparer - " + s) |> raise
+
+        let rec CompileExpression (prefix:string) (exp: MatcherExpression)  : (Context) -> bool =
             match exp with
-                | Property (prop, innerexp) -> CompileExpression (getPropName prefix prop) comparer innerexp 
-                | MatcherExpression.Not (innerexp) ->  CompileExpression prefix comparer innerexp >> not
-                | MatcherExpression.Binary (op, l, r) -> 
-                    let lExp = CompileExpression prefix comparer l;
-                    let rExp = CompileExpression prefix comparer r;
+                | Property (prop, innerexp) -> CompileExpression (getPropName prefix prop) innerexp 
+                | MatcherExpression.Not (innerexp) ->  CompileExpression prefix innerexp >> not
+                | MatcherExpression.Conjuction (op, l, r) -> 
+                    let lExp = CompileExpression prefix l;
+                    let rExp = CompileExpression prefix r;
                     match op with
                     |ConjuctionOp.And -> fun c-> (lExp c) && (rExp c)
                     |ConjuctionOp.Or -> fun c->  (lExp c) || (rExp c)
-                | ArrayTest (op, op_value) ->  
-                    (|>) prefix >> evaluateArrayTest comparer op op_value  
-                | Compare (op, op_value) ->  
-                    (|>) prefix >> evaluateComparison comparer op op_value
-                | TimeCompare (op, op_value) ->  
-                    evaluateTimeComparison prefix op op_value
-                | SwitchComparer (newComparer, innerexp) -> match getComparer(newComparer) with
-                    | Some inst_comparer -> innerexp|> CompileExpression prefix (createComparer(inst_comparer.Invoke))
-                    | None -> ParseError ("missing comparer - " + newComparer) |> raise
+                | Binary (op, comparisonType, op_value) ->
+                    let comaprer = (getComparer comparisonType)
+                    match (op, op_value) with
+                    | BinaryOp.In, _ -> (|>) prefix >> evaluateInArray comaprer op_value  
+                    | BinaryOp.CompareOp compare_op, _ -> (|>) prefix >> evaluateComparison comaprer compare_op op_value
+                    | BinaryOp.TimeOp time_op, _ -> evaluateTimeComparison prefix time_op op_value
+                    | BinaryOp.StringOp string_op, JsonValue.String string_value -> (|>) prefix >> Option.map JsonExtensions.AsString >> evaluateStringComparison string_op string_value
+                    | _ -> raise (ParseError "invalid binary matcher")
                 | Empty -> (fun context->true)
 
-        let defaultComparer (l:string) (r:string) = l.ToLower().CompareTo (r.ToLower())
-        CompileExpression "" defaultComparer exp
+        
+        CompileExpression "" exp
 
-    let parse (schema:JsonValue) = parsePropertySchema ConjuctionOp.And schema
+    let parse (schema:JsonValue) = parsePropertySchema ConjuctionOp.And ComparisonType.Auto schema 
 
     let createEvaluator (settings: ParserSettings) (matcher: MatcherExpression) =
         ( matcher |> (compile_internal settings.Comparers))

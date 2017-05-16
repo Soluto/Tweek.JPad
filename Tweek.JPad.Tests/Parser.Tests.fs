@@ -10,8 +10,11 @@ open Newtonsoft.Json
 open Tweek.JPad
 open FsCheck
 open System
+open PCLCrypto
+open Tests.Common
 
-let parser = JPadParser(ParserSettings())
+
+let parser = JPadParser(ParserSettings(defaultSha1Provider, dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))])))
 let createContext seq = ContextDelegate(fun name -> seq |> Seq.tryFind (fun (k,v)->k = name) |> Option.map (fun (k,v)->JsonValue.String v))
 
 let validate (rules:JPadEvaluateExt) context value = rules.Invoke context |> should equal value

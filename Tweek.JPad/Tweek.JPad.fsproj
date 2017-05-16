@@ -42,7 +42,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Common.fs" />
-    <Compile Include="Grammer.fs" />
+    <Compile Include="Ast.fs" />
     <Compile Include="Rule.fs" />
     <Compile Include="Parser.fs" />
     <Content Include="packages.config" />
@@ -58,10 +58,6 @@
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\packages\Newtonsoft.Json.10.0.2\lib\portable-net45+win8+wpa81+wp8\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="PCLCrypto">
-      <HintPath>..\packages\PCLCrypto.2.0.147\lib\portable-net45+win+wpa81+wp80+MonoAndroid10+xamarinios10+MonoTouch10\PCLCrypto.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.ValueTuple">

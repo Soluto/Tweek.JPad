@@ -3,7 +3,7 @@ open FSharp.Data;
 open System;
 open FSharpUtils.Newtonsoft;
 
-module Grammer = 
+module AST = 
     type JPad = {
         Partitions:Partitions
         Rules: RulesContainer
@@ -27,12 +27,11 @@ module Grammer =
     and MatcherExpression = 
             | Property of PropertyName * MatcherExpression
             | Not of MatcherExpression
-            | Binary of ConjuctionOp * MatcherExpression * MatcherExpression
-            | Compare of CompareOp * ComparisonValue
-            | TimeCompare of TimeOp * ComparisonValue
-            | ArrayTest of ArrayOp * ComparisonValue
-            | SwitchComparer of string * MatcherExpression
+            | Conjuction of ConjuctionOp * MatcherExpression * MatcherExpression
+            | Binary of BinaryOp * ComparisonType * ComparisonValue
             | Empty
+    and ComparisonType = | Auto
+                         | Custom of String
     and RuleValue = 
         | SingleVariant of JsonValue
         | MultiVariant  of ValueDistribution
@@ -50,11 +49,14 @@ module Grammer =
     and CompareOp = Equal | GreaterThan | LessThan | GreaterEqual | LessEqual | NotEqual 
     and TimeOp = WithinTime
     and Op = 
-        | CompareOp of CompareOp
+        | BinaryOp of BinaryOp
         | ConjuctionOp of ConjuctionOp
-        | ArrayOp of ArrayOp
-        | TimeOp of TimeOp
         | Not
+    and BinaryOp = 
+        | CompareOp of CompareOp
+        | StringOp of StringOp
+        | In
+        | TimeOp of TimeOp
     and UnaryOp = Not
-    and ArrayOp = In
+    and StringOp = Contains | StartsWith | EndsWith
     and ComparisonValue = JsonValue
