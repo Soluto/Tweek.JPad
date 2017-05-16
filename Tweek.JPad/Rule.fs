@@ -2,7 +2,8 @@
 open FSharp.Data;
 open System.Security;
 open Tweek.JPad.AST;
-open System.Text
+open System.Text;
+open System.Text.RegularExpressions;
 open System;
 open FSharpUtils.Newtonsoft;
 
@@ -27,6 +28,9 @@ module Matcher =
         |"$lt" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.LessThan))
         |"$ne" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.NotEqual))
         |"$in" -> Op.BinaryOp(BinaryOp.ArrayOp(ArrayOp.In))
+        |"$contains" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.Contains))
+        |"$startsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.StartsWith))
+        |"$endsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.EndsWith))
         |"$withinTime" -> Op.BinaryOp(BinaryOp.TimeOp(TimeOp.WithinTime))
         | s -> raise (ParseError("expected operator, found:"+s))
 
@@ -112,6 +116,16 @@ module Matcher =
                     | None, _ -> Exception("Missing system time details") |> raise
                     | Some now, Some fieldValue -> (now - fieldValue).Duration() < timespan)
 
+    let falseOnNone fn opt = match opt with |Some v -> if v = null then false else fn v 
+                                            |None -> false
+
+    let private evaluateStringComparison (op: StringOp) (leftValue:string) =
+        let casedValue = leftValue.ToLower
+        match (op) with
+            | StringOp.Contains -> (fun (s:string) ->s.ToLower().Contains leftValue ) |> falseOnNone
+            | StringOp.StartsWith -> (fun (s:string) ->s.ToLower().StartsWith leftValue ) |> falseOnNone
+            | StringOp.EndsWith -> (fun (s:string) ->s.ToLower().EndsWith leftValue ) |> falseOnNone
+
     let private evaluateArrayTest (comparer) (op: ArrayOp) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
         match jsonValue with
             | JsonValue.Array arr -> match op with
@@ -143,6 +157,8 @@ module Matcher =
 
     let getPropName prefix prop = if prefix = "" then prop else (prefix + "." + prop)
 
+
+
     let private compile_internal (comparers:System.Collections.Generic.IDictionary<string,ComparerDelegate>) exp  = 
         let defaultComparer (l:string) (r:string) = l.ToLower().CompareTo (r.ToLower())
         let getComparer comparisonType = match comparisonType with
@@ -161,10 +177,12 @@ module Matcher =
                     |ConjuctionOp.Or -> fun c->  (lExp c) || (rExp c)
                 | Binary (op, comparisonType, op_value) ->
                     let comaprer = (getComparer comparisonType)
-                    match (op) with
-                    | BinaryOp.ArrayOp array_op -> (|>) prefix >> evaluateArrayTest comaprer array_op op_value  
-                    | BinaryOp.CompareOp compare_op -> (|>) prefix >> evaluateComparison comaprer compare_op op_value
-                    | BinaryOp.TimeOp time_op -> evaluateTimeComparison prefix time_op op_value
+                    match (op, op_value) with
+                    | BinaryOp.ArrayOp array_op, _ -> (|>) prefix >> evaluateArrayTest comaprer array_op op_value  
+                    | BinaryOp.CompareOp compare_op, _ -> (|>) prefix >> evaluateComparison comaprer compare_op op_value
+                    | BinaryOp.TimeOp time_op, _ -> evaluateTimeComparison prefix time_op op_value
+                    | BinaryOp.StringOp string_op, JsonValue.String string_value -> (|>) prefix >> Option.map JsonExtensions.AsString >> evaluateStringComparison string_op string_value
+                    | _ -> raise (ParseError "invalid binary matcher")
                 | Empty -> (fun context->true)
 
         

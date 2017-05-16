@@ -199,3 +199,39 @@ let ``DateCompare using withinTime with invalid time unit format``() =
     (fun () -> validator """{"Birthday": {"$withinTime": "10z"}}""" |> ignore) |> should throw typeof<Exception>
     (fun () -> validator """{"Birthday": {"$withinTime": null}}""" |> ignore) |> should throw typeof<Exception>
     (fun () -> validator """{"Birthday": {"$withinTime": "a long long time ago"}}""" |> ignore) |> should throw typeof<Exception>
+
+[<Fact>]
+let ``String comparers - contains``() =
+    let validate = validator """{"Country": {"$contains": "ra" }}"""
+    validate (context [("Country", JsonValue.String("Australia"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("Israel"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("Italy"));])  |> should equal false
+    validate (context [])  |> should equal false
+
+[<Fact>]
+let ``String comparers - endsWith``() =
+    let validate = validator """{"Country": {"$endsWith": "land" }}"""
+    validate (context [("Country", JsonValue.String("Finland"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("England"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("Norway"));])  |> should equal false
+    validate (context [])  |> should equal false
+
+[<Fact>]
+let ``String comparers - startsWith``() =
+    let validate = validator """{"Country": {"$startsWith": "united" }}"""
+    validate (context [("Country", JsonValue.String("United Stated"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("United Kingdom"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("Russia"));])  |> should equal false
+    validate (context [])  |> should equal false
+
+[<Fact>]
+let ``String comparers - invalid comparison value``() =
+    (fun () -> validator """{"Country": {"$startsWith": null }}""" |> ignore) |> should throw typeof<ParseError>
+
+[<Fact>]
+let ``String comparers - null handling``() =
+    let validate = validator """{"Country": {"$startsWith": "united" }}"""
+    validate (context [||])  |> should equal false
+    validate (context [("Country", JsonValue.Null);])  |> should equal false
+    validate (context [("Country", JsonValue.String(null));])  |> should equal false
+    
