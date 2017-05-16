@@ -204,17 +204,15 @@ let ``DateCompare using withinTime with invalid time unit format``() =
 let ``String comparers - contains``() =
     let validate = validator """{"Country": {"$contains": "ra" }}"""
     validate (context [("Country", JsonValue.String("Australia"));])  |> should equal true
-    validate (context [("Country", JsonValue.String("Israel"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("IsrAel"));])  |> should equal true
     validate (context [("Country", JsonValue.String("Italy"));])  |> should equal false
-    validate (context [])  |> should equal false
 
 [<Fact>]
 let ``String comparers - endsWith``() =
     let validate = validator """{"Country": {"$endsWith": "land" }}"""
     validate (context [("Country", JsonValue.String("Finland"));])  |> should equal true
-    validate (context [("Country", JsonValue.String("England"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("EnglaND"));])  |> should equal true
     validate (context [("Country", JsonValue.String("Norway"));])  |> should equal false
-    validate (context [])  |> should equal false
 
 [<Fact>]
 let ``String comparers - startsWith``() =
@@ -222,7 +220,6 @@ let ``String comparers - startsWith``() =
     validate (context [("Country", JsonValue.String("United Stated"));])  |> should equal true
     validate (context [("Country", JsonValue.String("United Kingdom"));])  |> should equal true
     validate (context [("Country", JsonValue.String("Russia"));])  |> should equal false
-    validate (context [])  |> should equal false
 
 [<Fact>]
 let ``String comparers - invalid comparison value``() =
