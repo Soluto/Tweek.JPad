@@ -55,9 +55,8 @@ module AST =
     and BinaryOp = 
         | CompareOp of CompareOp
         | StringOp of StringOp
-        | ArrayOp of ArrayOp
+        | In
         | TimeOp of TimeOp
     and UnaryOp = Not
-    and ArrayOp = In
     and StringOp = Contains | StartsWith | EndsWith
     and ComparisonValue = JsonValue

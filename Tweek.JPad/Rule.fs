@@ -27,7 +27,7 @@ module Matcher =
         |"$le" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.LessEqual))
         |"$lt" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.LessThan))
         |"$ne" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.NotEqual))
-        |"$in" -> Op.BinaryOp(BinaryOp.ArrayOp(ArrayOp.In))
+        |"$in" -> Op.BinaryOp(BinaryOp.In)
         |"$contains" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.Contains))
         |"$startsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.StartsWith))
         |"$endsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.EndsWith))
@@ -126,10 +126,9 @@ module Matcher =
             | StringOp.StartsWith -> (fun (s:string) ->s.ToLower().StartsWith leftValue ) |> falseOnNone
             | StringOp.EndsWith -> (fun (s:string) ->s.ToLower().EndsWith leftValue ) |> falseOnNone
 
-    let private evaluateArrayTest (comparer) (op: ArrayOp) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
+    let private evaluateInArray (comparer) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
         match jsonValue with
-            | JsonValue.Array arr -> match op with
-                | ArrayOp.In ->  
+            | JsonValue.Array arr -> 
                 let compareItem = evaluateComparison comparer CompareOp.Equal
                 (fun contextValue -> arr |> Array.exists (fun item-> compareItem item contextValue ))
             | _ -> (fun _->false)
@@ -178,7 +177,7 @@ module Matcher =
                 | Binary (op, comparisonType, op_value) ->
                     let comaprer = (getComparer comparisonType)
                     match (op, op_value) with
-                    | BinaryOp.ArrayOp array_op, _ -> (|>) prefix >> evaluateArrayTest comaprer array_op op_value  
+                    | BinaryOp.In, _ -> (|>) prefix >> evaluateInArray comaprer op_value  
                     | BinaryOp.CompareOp compare_op, _ -> (|>) prefix >> evaluateComparison comaprer compare_op op_value
                     | BinaryOp.TimeOp time_op, _ -> evaluateTimeComparison prefix time_op op_value
                     | BinaryOp.StringOp string_op, JsonValue.String string_value -> (|>) prefix >> Option.map JsonExtensions.AsString >> evaluateStringComparison string_op string_value
