@@ -14,6 +14,7 @@ open Newtonsoft.Json
 open Tweek.JPad
 open FsCheck
 open System
+open Tests.Common
 
 let generatedCalculatedScheme weights = weights |> Array.mapi (fun a b -> (a,b) )
                                                 |> dict 
