@@ -12,8 +12,10 @@ open FSharpUtils.Newtonsoft;
 open Microsoft.FSharp.Reflection;
 open Tweek.JPad;
 open System;
+open PCLCrypto;
+open Tests.Common
 
-let validator jsonString = Matcher.createEvaluator (ParserSettings()) (jsonString|>JsonValue.Parse|>Matcher.parse)
+let validator jsonString = Matcher.createEvaluator (ParserSettings(defaultSha1Provider)) (jsonString|>JsonValue.Parse|>Matcher.parse)
 let createContext seq  =  fun (name:string) -> seq |> Seq.tryFind (fun (k,v)-> k = name) |> Option.map (fun (k,v)-> v)
 let context = createContext;
 
@@ -56,14 +58,14 @@ let ``"nested" context``() =
 let ``use custom comparer``() =
     let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))]);
     let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> Matcher.parse;
-    let validate =  Matcher.createEvaluator (ParserSettings(Comparers=comparers)) matcher;
+    let validate =  Matcher.createEvaluator (ParserSettings(defaultSha1Provider, Comparers=comparers)) matcher;
     validate (context [("AgentVersion", JsonValue.String("1.15.1"))]) |> should equal true;
 
 [<Fact>]
 let ``use custom comparer with broken mismatched target value should fail in compile time``() =
     let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))]);
     let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "debug-1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> Matcher.parse;
-    (fun () ->Matcher.createEvaluator (ParserSettings(Comparers=comparers)) matcher |> ignore) |> should throw typeof<ParseError>
+    (fun () ->Matcher.createEvaluator (ParserSettings(defaultSha1Provider, Comparers=comparers)) matcher |> ignore) |> should throw typeof<ParseError>
 
 [<Fact>]
 let ``exist/not exist prop support -> expressed with null``() =
@@ -199,3 +201,36 @@ let ``DateCompare using withinTime with invalid time unit format``() =
     (fun () -> validator """{"Birthday": {"$withinTime": "10z"}}""" |> ignore) |> should throw typeof<Exception>
     (fun () -> validator """{"Birthday": {"$withinTime": null}}""" |> ignore) |> should throw typeof<Exception>
     (fun () -> validator """{"Birthday": {"$withinTime": "a long long time ago"}}""" |> ignore) |> should throw typeof<Exception>
+
+[<Fact>]
+let ``String comparers - contains``() =
+    let validate = validator """{"Country": {"$contains": "ra" }}"""
+    validate (context [("Country", JsonValue.String("Australia"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("IsrAel"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("Italy"));])  |> should equal false
+
+[<Fact>]
+let ``String comparers - endsWith``() =
+    let validate = validator """{"Country": {"$endsWith": "land" }}"""
+    validate (context [("Country", JsonValue.String("Finland"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("EnglaND"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("Norway"));])  |> should equal false
+
+[<Fact>]
+let ``String comparers - startsWith``() =
+    let validate = validator """{"Country": {"$startsWith": "united" }}"""
+    validate (context [("Country", JsonValue.String("United Stated"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("United Kingdom"));])  |> should equal true
+    validate (context [("Country", JsonValue.String("Russia"));])  |> should equal false
+
+[<Fact>]
+let ``String comparers - invalid comparison value``() =
+    (fun () -> validator """{"Country": {"$startsWith": null }}""" |> ignore) |> should throw typeof<ParseError>
+
+[<Fact>]
+let ``String comparers - null handling``() =
+    let validate = validator """{"Country": {"$startsWith": "united" }}"""
+    validate (context [||])  |> should equal false
+    validate (context [("Country", JsonValue.Null);])  |> should equal false
+    validate (context [("Country", JsonValue.String(null));])  |> should equal false
+    
