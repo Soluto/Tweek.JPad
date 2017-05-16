@@ -147,7 +147,7 @@ module Matcher =
         let defaultComparer (l:string) (r:string) = l.ToLower().CompareTo (r.ToLower())
         let getComparer comparisonType = match comparisonType with
                                          | Auto -> defaultComparer
-                                         | Custom s -> if comparers.ContainsKey(s) then createComparer(comparers.[s].Invoke) else raise (Exception "invalid comparer");
+                                         | Custom s -> if comparers.ContainsKey(s) then createComparer(comparers.[s].Invoke) else ParseError("missing comparer - " + s) |> raise
 
         let rec CompileExpression (prefix:string) (exp: MatcherExpression)  : (Context) -> bool =
             match exp with
@@ -165,15 +165,6 @@ module Matcher =
                     | BinaryOp.ArrayOp array_op -> (|>) prefix >> evaluateArrayTest comaprer array_op op_value  
                     | BinaryOp.CompareOp compare_op -> (|>) prefix >> evaluateComparison comaprer compare_op op_value
                     | BinaryOp.TimeOp time_op -> evaluateTimeComparison prefix time_op op_value
-                //| ArrayTest (op, op_value) ->  
-                //    (|>) prefix >> evaluateArrayTest comparer op op_value  
-                //| Compare (op, op_value) ->  
-                //    (|>) prefix >> evaluateComparison comparer op op_value
-                //| TimeCompare (op, op_value) ->  
-                //    evaluateTimeComparison prefix op op_value
-                //| SwitchComparer (newComparer, innerexp) -> match getComparer(newComparer) with
-                //    | Some inst_comparer -> innerexp|> CompileExpression prefix (createComparer(inst_comparer.Invoke))
-                //    | None -> ParseError ("missing comparer - " + newComparer) |> raise
                 | Empty -> (fun context->true)
 
         

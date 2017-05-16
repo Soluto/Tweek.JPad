@@ -29,9 +29,6 @@ module AST =
             | Not of MatcherExpression
             | Conjuction of ConjuctionOp * MatcherExpression * MatcherExpression
             | Binary of BinaryOp * ComparisonType * ComparisonValue
-            //| TimeCompare of TimeOp * ComparisonValue
-            //| ArrayTest of ArrayOp * ComparisonValue
-            //| SwitchComparer of string * MatcherExpression
             | Empty
     and ComparisonType = | Auto
                          | Custom of String
