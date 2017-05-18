@@ -120,11 +120,11 @@ module Matcher =
                                             |None -> false
 
     let private evaluateStringComparison (op: StringOp) (leftValue:string) =
-        let casedValue = leftValue.ToLower
+        let casedValue = leftValue.ToLower()
         match (op) with
-            | StringOp.Contains -> (fun (s:string) ->s.ToLower().Contains leftValue ) |> falseOnNone
-            | StringOp.StartsWith -> (fun (s:string) ->s.ToLower().StartsWith leftValue ) |> falseOnNone
-            | StringOp.EndsWith -> (fun (s:string) ->s.ToLower().EndsWith leftValue ) |> falseOnNone
+            | StringOp.Contains -> (fun (s:string) ->s.ToLower().Contains casedValue ) |> falseOnNone
+            | StringOp.StartsWith -> (fun (s:string) ->s.ToLower().StartsWith casedValue ) |> falseOnNone
+            | StringOp.EndsWith -> (fun (s:string) ->s.ToLower().EndsWith casedValue ) |> falseOnNone
 
     let private evaluateInArray (comparer) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
         match jsonValue with
