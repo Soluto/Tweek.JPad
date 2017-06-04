@@ -85,6 +85,10 @@ type public JPadParser(settings:ParserSettings) =
         (fun evaluator -> JPadEvaluateExt(fun context -> let result = evaluator context.Invoke
                                                          if result.IsSome then result else jpad.DefaultValue ))
     
+    member public this.BuildAST : (string -> JPad) = 
+        JsonValue.Parse >>
+        buildAST
+        
     member public this.Parse : (string -> JPadEvaluateExt) = 
         JsonValue.Parse >>
         buildAST >>
