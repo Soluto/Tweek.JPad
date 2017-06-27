@@ -1,7 +1,8 @@
 ﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard1.6</TargetFramework>
-    <Version>0.6.2</Version>
+    <Version Condition="$(appveyor_build_version)!=''">$(appveyor_build_version)</Version>
+    <Version Condition="$(appveyor_build_version)==''">0.6.0-development</Version>
     <Company>Soluto</Company>
     <Description>The default rules engine for Tweek</Description>
     <RepositoryUrl>https://github.com/Soluto/Tweek.JPad.git</RepositoryUrl>
