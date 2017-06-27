@@ -9,10 +9,15 @@ open Newtonsoft.Json
 open Tweek.JPad
 open FsCheck
 open System
+open System.Text
 open Tests.Common
 
 type ``TypedValueDistribution Tests`` ()=
-    let parser = JPadParser(ParserSettings(defaultSha1Provider))
+    let mutable lastSalt = ""
+    let hashProvider = Sha1Provider(fun input ->
+        lastSalt <- Encoding.UTF8.GetString input |> fun x -> x.Split '.' |> Array.last
+        defaultSha1Provider.Invoke input)
+    let parser = JPadParser(ParserSettings(hashProvider))
     let createContext seq = ContextDelegate(fun name -> seq |> Seq.tryFind (fun (k,v)->k = name) |> Option.map (fun (k,v)->JsonValue.String v))
     let validate (rules:JPadEvaluateExt) context value = rules.Invoke context |> should equal (Some(value))
     let context = createContext [("device.@@id","123");]
@@ -112,7 +117,8 @@ type ``TypedValueDistribution Tests`` ()=
                 }
             ]
         }"""
-        validate rules context (JsonValue.String "true")
+        rules.Invoke context 
+        lastSalt |> should equal "32123"
 
     [<Fact>]
     member test.``value distribution with Salt should be the same as Id``() =
@@ -122,4 +128,10 @@ type ``TypedValueDistribution Tests`` ()=
         let saltRules = getRules "Salt" salt |> parser.Parse
         let idRules = getRules "Id" salt |> parser.Parse
 
-        saltRules.Invoke context |> should equal (idRules.Invoke context)
+        let saltResult = saltRules.Invoke context
+        lastSalt |> should equal salt
+        lastSalt <- ""
+        let idResult = idRules.Invoke context
+        lastSalt |> should equal salt
+
+        saltResult |> should equal idResult
