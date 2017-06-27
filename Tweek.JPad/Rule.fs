@@ -242,7 +242,7 @@ module Rule =
                             | "MultiVariant" -> RuleValue.MultiVariant({
                                 DistributionType = ValueDistribution.parse valueType jsonRule.["ValueDistribution"] 
                                 OwnerType = jsonRule.TryGetProperty("OwnerType") |> Option.map JsonExtensions.AsString
-                                Salt = jsonRule.["Id"].AsString()
+                                Salt = (match jsonRule.TryGetProperty("Salt") with | None -> jsonRule.["Id"] | Some v -> v) |> JsonExtensions.AsString
                                 })
                             | _ -> raise (ParseError("not supported value distrubtion"))
         (matcher, value)
