@@ -85,7 +85,7 @@ namespace Tweek.JPad.Cli
                 IReadOnlyDictionary<string, JsonValue> context = contextOptions.Values
                     .Select(x => contextRegex.Match(x))
                     .Select(match => new { key = match.Groups[1].Value, value = match.Groups[2].Value })
-                    .ToDictionary(x => x.key, x => JsonValue.Parse(x.value), StringComparer.OrdinalIgnoreCase);
+                    .ToDictionary(x => x.key, x => JsonValue.NewString(x.value), StringComparer.OrdinalIgnoreCase);
 
                 var result = fs(compiled.Invoke(s => fs(context.TryGetValue(s))));
 
