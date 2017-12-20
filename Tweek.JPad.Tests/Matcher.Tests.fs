@@ -12,6 +12,7 @@ open Microsoft.FSharp.Reflection;
 open Tweek.JPad;
 open System;
 open Tests.Common
+open FSharpUtils.Newtonsoft
 
 type ``Matcher tests`` ()=
     let validator jsonString = Matcher.createEvaluator (ParserSettings(defaultSha1Provider)) (jsonString|>JsonValue.Parse|>Matcher.parse)
@@ -200,6 +201,16 @@ type ``Matcher tests`` ()=
         (fun () -> validator """{"Birthday": {"$withinTime": "10z"}}""" |> ignore) |> should throw typeof<Exception>
         (fun () -> validator """{"Birthday": {"$withinTime": null}}""" |> ignore) |> should throw typeof<Exception>
         (fun () -> validator """{"Birthday": {"$withinTime": "a long long time ago"}}""" |> ignore) |> should throw typeof<Exception>
+
+    [<Fact>]
+    member test.``DateCompare with string comparer``() =
+        let validate = validator """{"Birthday": {"$ge": "2014-12-20T13:14:19.790Z", "$compare": "date"}}"""
+        validate (context [("Birthday", JsonValue.String("2015-12-20T13:14:19.790Z"));] ) |> should equal true
+        validate (context [("Birthday", JsonValue.String("2013-12-20T13:14:19.790Z"));] ) |> should equal false
+    
+    [<Fact>]
+    member test.``DateCompare should fail to compile matcher with an invalid date``() =
+        (fun () -> validator """{"Birthday": {"$gt": "aa2014-12-20T13:14:19.790Z", "$compare": "date"}}""" |> ignore) |> should throw typeof<ParseError>
 
     [<Fact>]
     member test.``String comparers - contains``() =
