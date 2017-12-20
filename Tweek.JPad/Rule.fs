@@ -9,6 +9,7 @@ open FSharpUtils.Newtonsoft;
 
 module Matcher = 
 
+    let inline toMap kvps = kvps |> Seq.map (|KeyValue|) |> Map.ofSeq
     let nullProtect x = match x with |null -> None |_-> Some x;
 
     let (|KeyProperty|Operator|) (input:string) = if input.[0] = '$' then Operator else KeyProperty
@@ -158,7 +159,7 @@ module Matcher =
 
 
 
-    let private compile_internal (comparers:System.Collections.Generic.IDictionary<string,ComparerDelegate>) exp  = 
+    let private compile_internal (comparers:Map<string,ComparerDelegate>) exp  = 
         let defaultComparer (l:string) (r:string) = l.ToLower().CompareTo (r.ToLower())
         let getComparer comparisonType = match comparisonType with
                                          | Auto -> defaultComparer
@@ -190,7 +191,8 @@ module Matcher =
     let parse (schema:JsonValue) = parsePropertySchema ConjuctionOp.And ComparisonType.Auto schema 
 
     let createEvaluator (settings: ParserSettings) (matcher: MatcherExpression) =
-        ( matcher |> (compile_internal settings.Comparers))
+        let comparersMaps = (settings.Comparers |> toMap).Add("date", new ComparerDelegate(fun x -> DateTime.Parse(x) :> IComparable))
+        (matcher |> (compile_internal comparersMaps))
 
 module ValueDistribution = 
     let private uniformCalc (choices:JsonValue[]) (hash) = 
