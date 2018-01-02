@@ -1,15 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp1.1</TargetFramework>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tweek.JPad\Tweek.JPad.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FSharp.Core" Version="4.2.1" />
-    <PackageReference Include="LanguageExt.Core" Version="2.0.80" />
-    <PackageReference Include="LanguageExt.FSharp" Version="2.0.80" />
+    <PackageReference Include="LanguageExt.Core" Version="2.1.32" />
+    <PackageReference Include="LanguageExt.FSharp" Version="2.1.32" />
     <PackageReference Include="Microsoft.Extensions.CommandLineUtils" Version="1.1.1" />
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
   </ItemGroup>
