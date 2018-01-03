@@ -14,6 +14,7 @@ open Tweek.JPad
 open FsCheck
 open System
 open Tests.Common
+open Tweek.JPad.AST
 
 type ``ValueDistributor tests`` () =
     let generatedCalculatedScheme weights = weights |> Array.mapi (fun a b -> (a,b) )
@@ -122,3 +123,24 @@ type ``ValueDistributor tests`` () =
                              prev
                              |> Array.forall (fun x-> next |> Array.contains x)
                              |> should equal true)
+
+    [<Fact>]
+    member test.``Parse args array format``() =
+        let expected = [| (JsonValue.String("v1"), 30); (JsonValue.String("v2"), 70) |]
+        let valueDistribution = JsonValue.Parse("""{
+            "type": "weighted",
+            "args": [
+                {
+                    "value": "v1",
+                    "weight": 30
+                },
+                {
+                    "value": "v2",
+                    "weight": 70
+                }
+            ]
+        }""")
+        let parsed = ValueDistribution.parse "string" valueDistribution
+        match parsed with
+            | DistributionType.Weighted weighted -> weighted |> should equal expected
+            | _ -> failwith "expected Weighted distribution"

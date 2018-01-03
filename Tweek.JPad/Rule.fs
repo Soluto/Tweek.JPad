@@ -6,6 +6,7 @@ open System.Text;
 open System.Text.RegularExpressions;
 open System;
 open FSharpUtils.Newtonsoft;
+open System
 
 module Matcher = 
 
@@ -217,10 +218,14 @@ module ValueDistribution =
         | "number" -> JsonValue.Number (value |> decimal);
         |  _ -> JsonValue.String value;
 
-    let parseValueDistribution (args:JsonValue) (valueType:string)  distributionType = match distributionType with
+    let parseWeightedArgs (args:JsonValue) (valueType:string) = match args with
+        | JsonValue.Record record -> record |> Array.map (fun (k,v)-> (parseValueWithValueType valueType k, v.AsInteger()))
+        | JsonValue.Array array -> array |> Array.map (fun item-> (item.["value"], item.["weight"].AsInteger()))
+
+    let parseValueDistribution (args:JsonValue) (valueType:string) distributionType = match distributionType with
         | "uniform" -> DistributionType.Uniform (args.AsArray())
         | "bernoulliTrial" -> DistributionType.Bernouli (args.AsFloat())
-        | "weighted" -> DistributionType.Weighted (args.Properties() |> Array.map (fun (k,v)-> (parseValueWithValueType valueType k, v.AsInteger())))
+        | "weighted" -> DistributionType.Weighted (parseWeightedArgs args valueType)
 
     let parse valueType (jsonRule:JsonValue) = jsonRule.["type"] |> JsonExtensions.AsString |> (parseValueDistribution jsonRule.["args"] valueType)
 
