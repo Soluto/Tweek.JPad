@@ -213,6 +213,26 @@ type ``Matcher tests`` ()=
         (fun () -> validator """{"Birthday": {"$gt": "aa2014-12-20T13:14:19.790Z", "$compare": "date"}}""" |> ignore) |> should throw typeof<ParseError>
 
     [<Fact>]
+    member test.``Array comparers - contains``() =
+        let validate = validator """{"Countries": {"$contains": "AustRalia" }}"""
+        let validateEmpty = validator """{"Countries": {"$contains": "" }}"""
+        let validateList= validator """{"Countries": {"$contains": ["israel","iTaly"] }}"""
+        let validateEmptyList = validator """{"Countries": {"$contains": [] }}"""
+        let contries1 = [|JsonValue.String("IsrAel");JsonValue.String("Italy");JsonValue.String("Australia")|]
+        let contries2 = [|JsonValue.String("IsrAel");JsonValue.String("fRance");JsonValue.String("GermaNy");JsonValue.String("iReland")|]
+        let noCountries = [||]
+        validate (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
+        validate (context [("Countries", JsonValue.Array(contries2));])  |> should equal false
+        validate (context [("Countries", JsonValue.Array(noCountries));])  |> should equal false
+        validateEmpty (context [("Countries", JsonValue.Array(contries1));])  |> should equal false
+        validateEmpty (context [("Countries", JsonValue.Array(noCountries));])  |> should equal false
+        validateList (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
+        validateList (context [("Countries", JsonValue.Array(contries2));])  |> should equal false
+        validateList (context [("Countries", JsonValue.Array(noCountries));])  |> should equal false
+        validateEmptyList (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
+        validateEmptyList (context [("Countries", JsonValue.Array(noCountries));])  |> should equal true
+
+    [<Fact>]
     member test.``String comparers - contains``() =
         let validate = validator """{"Country": {"$contains": "ra" }}"""
         validate (context [("Country", JsonValue.String("Australia"));])  |> should equal true
