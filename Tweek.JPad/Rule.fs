@@ -30,7 +30,7 @@ module Matcher =
         |"$lt" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.LessThan))
         |"$ne" -> Op.BinaryOp(BinaryOp.CompareOp(CompareOp.NotEqual))
         |"$in" -> Op.BinaryOp(BinaryOp.In)
-        |"$contains" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.Contains))
+        |"$contains" -> Op.BinaryOp(BinaryOp.ContainsOp)
         |"$startsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.StartsWith))
         |"$endsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.EndsWith))
         |"$withinTime" -> Op.BinaryOp(BinaryOp.TimeOp(TimeOp.WithinTime))
@@ -60,7 +60,7 @@ module Matcher =
             | JsonValue.String l -> (comparer l) |> (fun comparison rightValue -> 
                 match rightValue with 
                 | None -> false 
-                |Some json -> match json with 
+                | Some json -> match json with 
                     |JsonValue.String v -> evaluateComparisonOp op (comparison v) 0
                     | _ -> false)
             | _ -> (fun (rightValueOption:Option<ComparisonValue>) -> match (leftValue, op, rightValueOption) with
@@ -118,22 +118,34 @@ module Matcher =
                     | None, _ -> Exception("Missing system time details") |> raise
                     | Some now, Some fieldValue -> (now - fieldValue).Duration() < timespan)
 
-    let falseOnNone fn opt = match opt with |Some v -> if v = null then false else fn v 
+    let inline isNull value = obj.ReferenceEquals(value, null)
+
+    let falseOnNone fn opt = match opt with |Some v -> if isNull v then false else fn v 
                                             |None -> false
+
 
     let private evaluateStringComparison (op: StringOp) (leftValue:string) =
         let casedValue = leftValue.ToLower()
         match (op) with
-            | StringOp.Contains -> (fun (s:string) ->s.ToLower().Contains casedValue ) |> falseOnNone
             | StringOp.StartsWith -> (fun (s:string) ->s.ToLower().StartsWith casedValue ) |> falseOnNone
             | StringOp.EndsWith -> (fun (s:string) ->s.ToLower().EndsWith casedValue ) |> falseOnNone
 
     let private evaluateInArray (comparer) (jsonValue:ComparisonValue) : (Option<JsonValue>->bool) =
         match jsonValue with
-            | JsonValue.Array arr -> 
+            | Array arr -> 
                 let compareItem = evaluateComparison comparer CompareOp.Equal
-                (fun contextValue -> arr |> Array.exists (fun item-> compareItem item contextValue ))
+                (fun contextValue -> arr |> Array.exists (fun item -> compareItem item contextValue ))
             | _ -> (fun _->false)
+
+    let private evaluateContains (leftValue:ComparisonValue) (rightValue:JsonValue) =    
+        let comparer (left:string) (right:JsonValue) = left.ToLower() = right.AsString().ToLower()
+        let arrayExist item array = array |> Array.exists (comparer item)
+        
+        match (leftValue, rightValue) with 
+            | String l, String r -> r.ToLower().Contains(l.ToLower())
+            | String l, Array r -> arrayExist l r
+            | Array l, Array r -> l |> Array.forall (fun i -> arrayExist (i.AsString()) r)
+            | _, _ -> false
 
     let rec private parsePropertySchema (conjuctionOp : ConjuctionOp)  (comparisonType:ComparisonType) (schema:JsonValue)  : MatcherExpression = 
         match schema with 
@@ -183,6 +195,8 @@ module Matcher =
                     | BinaryOp.CompareOp compare_op, _ -> (|>) prefix >> evaluateComparison comaprer compare_op op_value
                     | BinaryOp.TimeOp time_op, _ -> evaluateTimeComparison prefix time_op op_value
                     | BinaryOp.StringOp string_op, JsonValue.String string_value -> (|>) prefix >> Option.map JsonExtensions.AsString >> evaluateStringComparison string_op string_value
+                    | BinaryOp.ContainsOp, contains_value -> (|>) prefix >> (evaluateContains contains_value |> falseOnNone) 
+
                     | _ -> raise (ParseError "invalid binary matcher")
                 | Empty -> (fun context->true)
 
