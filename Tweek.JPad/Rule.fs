@@ -145,9 +145,9 @@ module Matcher =
         
         match (leftValue, rightValue) with 
             | String l, String r -> r.ToLower().Contains(l.ToLower())
-            | String l, Array r -> arrayExist leftValue  r
-            | Array l, String r -> Array.length l = 1 &&  arrayExist rightValue l
             | Array l, Array r -> l |> Array.forall (fun i -> arrayExist i r)
+            | _, Array r -> arrayExist leftValue  r
+            | Array l, _ -> Array.length l = 1 &&  arrayExist rightValue l
             | _, _ -> false
 
     let rec private parsePropertySchema (conjuctionOp : ConjuctionOp)  (comparisonType:ComparisonType) (schema:JsonValue)  : MatcherExpression = 
