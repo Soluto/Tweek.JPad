@@ -76,10 +76,12 @@ module Matcher =
                             | JsonValue.Null, CompareOp.Equal, _ -> false
                             | JsonValue.Null, CompareOp.NotEqual, _ -> true
                             | JsonValue.Number x, _ , JsonValue.Number y -> evaluateComparisonOp op x y
+                            | JsonValue.Number x, _ , JsonValue.Float y -> evaluateComparisonOp op x (decimal y)
                             | JsonValue.Number x, _ , JsonValue.String y -> decimal y |> evaluateComparisonOp op x 
                             | JsonValue.Boolean x, _ ,JsonValue.Boolean y -> evaluateComparisonOp op x y
                             | JsonValue.Boolean x, _ ,JsonValue.String y -> bool.Parse y |> evaluateComparisonOp op x
                             | JsonValue.Float x, _ ,JsonValue.Float y -> evaluateComparisonOp op x y
+                            | JsonValue.Float x, _ ,JsonValue.Number y -> evaluateComparisonOp op (decimal x) y
                             | JsonValue.Float x, _ ,JsonValue.String y -> float y |> evaluateComparisonOp op x
                             | _ , _ , _ -> Exception("non matching types") |> raise
                         )
@@ -138,13 +140,14 @@ module Matcher =
             | _ -> (fun _->false)
 
     let private evaluateContains (leftValue:ComparisonValue) (rightValue:JsonValue) =    
-        let comparer (left:string) (right:JsonValue) = left.ToLower() = right.AsString().ToLower()
-        let arrayExist item array = array |> Array.exists (comparer item)
+        let comparer (l:string) (r:string) =  l.ToLower().CompareTo (r.ToLower())
+        let arrayExist item array = array |> Array.exists (fun t->  (evaluateComparison comparer CompareOp.Equal item (Some t)))
         
         match (leftValue, rightValue) with 
             | String l, String r -> r.ToLower().Contains(l.ToLower())
-            | String l, Array r -> arrayExist l r
-            | Array l, Array r -> l |> Array.forall (fun i -> arrayExist (i.AsString()) r)
+            | String l, Array r -> arrayExist leftValue  r
+            | Array l, String r -> Array.length l = 1 &&  arrayExist rightValue l
+            | Array l, Array r -> l |> Array.forall (fun i -> arrayExist i r)
             | _, _ -> false
 
     let rec private parsePropertySchema (conjuctionOp : ConjuctionOp)  (comparisonType:ComparisonType) (schema:JsonValue)  : MatcherExpression = 

@@ -217,9 +217,12 @@ type ``Matcher tests`` ()=
         let validate = validator """{"Countries": {"$contains": "AustRalia" }}"""
         let validateEmpty = validator """{"Countries": {"$contains": "" }}"""
         let validateList= validator """{"Countries": {"$contains": ["israel","iTaly"] }}"""
+        let validateNumberList= validator """{"Codes": {"$contains": [1] }}"""
+        let validateSingleList= validator """{"Countries": {"$contains": ["israel"] }}"""
         let validateEmptyList = validator """{"Countries": {"$contains": [] }}"""
         let contries1 = [|JsonValue.String("IsrAel");JsonValue.String("Italy");JsonValue.String("Australia")|]
         let contries2 = [|JsonValue.String("IsrAel");JsonValue.String("fRance");JsonValue.String("GermaNy");JsonValue.String("iReland")|]
+        let codes1 = [|JsonValue.Number(1m);JsonValue.Number(2m);JsonValue.Number(3m)|]
         let noCountries = [||]
         validate (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
         validate (context [("Countries", JsonValue.Array(contries2));])  |> should equal false
@@ -229,8 +232,12 @@ type ``Matcher tests`` ()=
         validateList (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
         validateList (context [("Countries", JsonValue.Array(contries2));])  |> should equal false
         validateList (context [("Countries", JsonValue.Array(noCountries));])  |> should equal false
+        validateSingleList (context [("Countries", JsonValue.String("IsrAel"));])  |> should equal true
+        validateSingleList (context [("Countries", JsonValue.String("Isrel"));])  |> should equal false
+        validateList (context [("Countries", JsonValue.String("IsrAel"));])  |> should equal false
         validateEmptyList (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
         validateEmptyList (context [("Countries", JsonValue.Array(noCountries));])  |> should equal true
+        validateNumberList (context [("Codes", JsonValue.Array(codes1));])  |> should equal true
 
     [<Fact>]
     member test.``String comparers - contains``() =
