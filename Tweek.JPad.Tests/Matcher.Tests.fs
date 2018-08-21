@@ -233,9 +233,9 @@ type ``Matcher tests`` ()=
         validateList (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
         validateList (context [("Countries", JsonValue.Array(contries2));])  |> should equal false
         validateList (context [("Countries", JsonValue.Array(noCountries));])  |> should equal false
+        validateList (context [("Countries", JsonValue.String("IsrAel"));])  |> should equal false
         validateSingleList (context [("Countries", JsonValue.String("IsrAel"));])  |> should equal true
         validateSingleList (context [("Countries", JsonValue.String("Isrel"));])  |> should equal false
-        validateList (context [("Countries", JsonValue.String("IsrAel"));])  |> should equal false
         validateEmptyList (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
         validateEmptyList (context [("Countries", JsonValue.Array(noCountries));])  |> should equal true
         validateNumberList (context [("Codes", JsonValue.Array(codes1));])  |> should equal true
