@@ -65,16 +65,16 @@ module Matcher =
                     | _ -> false)
             | _ -> (fun (rightValueOption:Option<ComparisonValue>) -> match (leftValue, op, rightValueOption) with
                 | JsonValue.Null, CompareOp.Equal, None -> true
-                | JsonValue.Null, CompareOp.NotEqual, None -> false
-                | _, CompareOp.Equal, None -> false
+                | JsonValue.Null, _, None -> false
                 | _, CompareOp.NotEqual, None -> true
+                | _, _, None -> false
                 | _, _, Some rightValue -> match (leftValue, op,  rightValue) with
                             | JsonValue.Null, CompareOp.Equal, JsonValue.Null -> true
-                            | JsonValue.Null, CompareOp.NotEqual, JsonValue.Null -> false
-                            | _, CompareOp.Equal, JsonValue.Null -> false
+                            | JsonValue.Null, _, JsonValue.Null -> false
                             | _, CompareOp.NotEqual, JsonValue.Null -> true
-                            | JsonValue.Null, CompareOp.Equal, _ -> false
                             | JsonValue.Null, CompareOp.NotEqual, _ -> true
+                            | _, _, JsonValue.Null -> false
+                            | JsonValue.Null, _, _ -> false
                             | JsonValue.Number x, _ , JsonValue.Number y -> evaluateComparisonOp op x y
                             | JsonValue.Number x, _ , JsonValue.Float y -> evaluateComparisonOp op x (decimal y)
                             | JsonValue.Number x, _ , JsonValue.String y -> decimal y |> evaluateComparisonOp op x 
@@ -106,6 +106,7 @@ module Matcher =
         | Some value -> 
             match value with
             | JsonValue.String stringValue -> stringValue |> DateTime.Parse |> Some
+            | JsonValue.Null -> None
             | _ -> Exception("Invalid time format") |> raise
 
     let private evaluateTimeComparison (prefix) (op: TimeOp) (leftValue:ComparisonValue)  =

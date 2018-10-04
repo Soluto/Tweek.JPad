@@ -94,6 +94,7 @@ type ``Matcher tests`` ()=
         validate (context [("Age", JsonValue.Number(31m));])  |> should equal false
         validate (context [("Age", JsonValue.Number(30m));])  |> should equal true
         validate (context [("Age", JsonValue.Number(29m));])  |> should equal false
+        validate (context [("Age", JsonValue.Null);]) |> should equal false
 
     [<Fact>]
     member test.``Use greaterEqual``() =
@@ -101,6 +102,7 @@ type ``Matcher tests`` ()=
         validate (context [("Age", JsonValue.Number(31m));])  |> should equal true
         validate (context [("Age", JsonValue.Number(30m));])  |> should equal true
         validate (context [("Age", JsonValue.Number(29m));])  |> should equal false
+        validate (context [("Age", JsonValue.Null);]) |> should equal false
 
     [<Fact>]
     member test.``Use lessEqual``() =
@@ -108,6 +110,7 @@ type ``Matcher tests`` ()=
         validate (context [("Age", JsonValue.Number(31m));])  |> should equal false
         validate (context [("Age", JsonValue.Number(30m));])  |> should equal true
         validate (context [("Age", JsonValue.Number(29m));])  |> should equal true
+        validate (context [("Age", JsonValue.Null);]) |> should equal false
 
     [<Fact>]
     member test.``Use lessThanOp``() =
@@ -115,6 +118,7 @@ type ``Matcher tests`` ()=
         validate (context [("Age", JsonValue.Number(31m));])  |> should equal false
         validate (context [("Age", JsonValue.Number(30m));])  |> should equal false
         validate (context [("Age", JsonValue.Number(29m));])  |> should equal true
+        validate (context [("Age", JsonValue.Null);]) |> should equal false
 
     [<Fact>]
     member test.``Use greaterThenOp``() =
@@ -122,6 +126,7 @@ type ``Matcher tests`` ()=
         validate (context [("Age", JsonValue.Number(31m));])  |> should equal true
         validate (context [("Age", JsonValue.Number(30m));])  |> should equal false
         validate (context [("Age", JsonValue.Number(29m));])  |> should equal false
+        validate (context [("Age", JsonValue.Null);]) |> should equal false
 
     [<Fact>]
     member test.``Use implict Equal``() =
@@ -131,6 +136,7 @@ type ``Matcher tests`` ()=
         compareValidators (context [("Age", JsonValue.Number(31m));]) 
         compareValidators (context [("Age", JsonValue.Number(30m));]) 
         compareValidators (context [("Age", JsonValue.Number(29m));]) 
+        compareValidators (context [("Age", JsonValue.Null);])
 
     [<Fact>]
     member test.``Compare numeric values``() =
@@ -181,6 +187,7 @@ type ``Matcher tests`` ()=
         validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddDays(-20.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal false
         validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddDays(-5.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal true
         validate (context [])  |> should equal false
+        validate (context [("Birthday", JsonValue.Null);]) |> should equal false
 
     [<Fact>]
     member test.``DateCompare using withinTime with hours``() =
@@ -188,6 +195,7 @@ type ``Matcher tests`` ()=
         validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddHours(-20.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal false
         validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddHours(-5.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal true
         validate (context [])  |> should equal false
+        validate (context [("Birthday", JsonValue.Null);]) |> should equal false
 
     [<Fact>]
     member test.``DateCompare using withinTime with minutes``() =
@@ -195,6 +203,7 @@ type ``Matcher tests`` ()=
         validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddMinutes(-20.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal false
         validate (context [("Birthday", JsonValue.String(DateTime.UtcNow.AddMinutes(-5.0).ToString()));("system.time_utc", JsonValue.String(DateTime.UtcNow.ToString()));])  |> should equal true
         validate (context [])  |> should equal false
+        validate (context [("Birthday", JsonValue.Null);]) |> should equal false
 
     [<Fact>]
     member test.``DateCompare using withinTime with invalid time unit format``() =
@@ -207,6 +216,7 @@ type ``Matcher tests`` ()=
         let validate = validator """{"Birthday": {"$ge": "2014-12-20T13:14:19.790Z", "$compare": "date"}}"""
         validate (context [("Birthday", JsonValue.String("2015-12-20T13:14:19.790Z"));] ) |> should equal true
         validate (context [("Birthday", JsonValue.String("2013-12-20T13:14:19.790Z"));] ) |> should equal false
+        validate (context [("Birthday", JsonValue.Null);]) |> should equal false
     
     [<Fact>]
     member test.``DateCompare should fail to compile matcher with an invalid date``() =
@@ -227,17 +237,23 @@ type ``Matcher tests`` ()=
         validate (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
         validate (context [("Countries", JsonValue.Array(contries2));])  |> should equal false
         validate (context [("Countries", JsonValue.Array(noCountries));])  |> should equal false
+        validate (context [("Countries", JsonValue.Null);])  |> should equal false
         validateEmpty (context [("Countries", JsonValue.Array(contries1));])  |> should equal false
         validateEmpty (context [("Countries", JsonValue.Array(noCountries));])  |> should equal false
+        validateEmpty (context [("Countries", JsonValue.Null);])  |> should equal false
         validateList (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
         validateList (context [("Countries", JsonValue.Array(contries2));])  |> should equal false
         validateList (context [("Countries", JsonValue.Array(noCountries));])  |> should equal false
+        validateList (context [("Countries", JsonValue.String("IsrAel"));])  |> should equal false
+        validateList (context [("Countries", JsonValue.Null);])  |> should equal false
         validateSingleList (context [("Countries", JsonValue.String("IsrAel"));])  |> should equal true
         validateSingleList (context [("Countries", JsonValue.String("Isrel"));])  |> should equal false
-        validateList (context [("Countries", JsonValue.String("IsrAel"));])  |> should equal false
+        validateSingleList (context [("Countries", JsonValue.Null);])  |> should equal false
         validateEmptyList (context [("Countries", JsonValue.Array(contries1));])  |> should equal true
         validateEmptyList (context [("Countries", JsonValue.Array(noCountries));])  |> should equal true
+        validateEmptyList (context [("Countries", JsonValue.Null);])  |> should equal false
         validateNumberList (context [("Codes", JsonValue.Array(codes1));])  |> should equal true
+        validateNumberList (context [("Codes", JsonValue.Null);])  |> should equal false
 
     [<Fact>]
     member test.``String comparers - contains``() =
