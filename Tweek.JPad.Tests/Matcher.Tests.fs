@@ -178,8 +178,8 @@ type ``Matcher tests`` ()=
 
     [<Fact>]
     member test.``Compare incompatible values``() =
-        let validate = validator """{"Age": 30}"""
-        validate (context [("Age", JsonValue.Boolean(false));])  |> should equal false
+        validator """{"Age": 30}""" (context [("Age", JsonValue.Boolean(false));])  |> should equal false
+        validator """{"Age": {"$ne": 30}}""" (context [("Age", JsonValue.Boolean(false));])  |> should equal true
         
     [<Fact>]
     member test.``DateCompare using withinTime with days``() =

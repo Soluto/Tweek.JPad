@@ -83,6 +83,7 @@ module Matcher =
                             | JsonValue.Float x, _ ,JsonValue.Float y -> evaluateComparisonOp op x y
                             | JsonValue.Float x, _ ,JsonValue.Number y -> evaluateComparisonOp op (decimal x) y
                             | JsonValue.Float x, _ ,JsonValue.String y -> float y |> evaluateComparisonOp op x
+                            | _ , CompareOp.NotEqual , _ -> true
                             | _ , _ , _ -> false
                         )
 
