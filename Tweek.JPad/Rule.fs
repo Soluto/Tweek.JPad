@@ -83,7 +83,7 @@ module Matcher =
                             | JsonValue.Float x, _ ,JsonValue.Float y -> evaluateComparisonOp op x y
                             | JsonValue.Float x, _ ,JsonValue.Number y -> evaluateComparisonOp op (decimal x) y
                             | JsonValue.Float x, _ ,JsonValue.String y -> float y |> evaluateComparisonOp op x
-                            | _ , _ , _ -> Exception("non matching types") |> raise
+                            | _ , _ , _ -> false
                         )
 
     let private (|Suffix|_|) (p:string) (s:string) =
