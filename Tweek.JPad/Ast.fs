@@ -58,6 +58,7 @@ module AST =
         | ContainsOp
         | AnyOp
         | AllOp
+        | IsOp
         | In
         | TimeOp of TimeOp
     and UnaryOp = Not

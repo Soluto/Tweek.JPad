@@ -15,6 +15,10 @@ module Matcher =
 
     let private reduceOrElse reduceFun alt seq = if not (Seq.isEmpty(seq)) then seq|> Seq.reduce reduceFun else alt
 
+    let private createNestedContext (value: JsonValue) (name: string) = match name with
+                                                                           | "" -> Some value
+                                                                           | _ -> value.Properties() |> Array.tryFind (fun (p, _)->StringComparer.OrdinalIgnoreCase.Compare(p, name) = 0) |> Option.map snd
+
     let private parseOp op : Op = match op with
         |"$not" -> Op.Not
         |"$or" -> Op.ConjuctionOp(ConjuctionOp.Or)
@@ -28,6 +32,7 @@ module Matcher =
         |"$in" -> Op.BinaryOp(BinaryOp.In)
         |"$contains" -> Op.BinaryOp(BinaryOp.ContainsOp)
         |"$any" -> Op.BinaryOp(BinaryOp.AnyOp)
+        |"$is" -> Op.BinaryOp(BinaryOp.IsOp)
         |"$all" -> Op.BinaryOp(BinaryOp.AllOp)
         |"$startsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.StartsWith))
         |"$endsWith" -> Op.BinaryOp(BinaryOp.StringOp(StringOp.EndsWith))
@@ -206,26 +211,25 @@ module Matcher =
                     | BinaryOp.ContainsOp, contains_value -> (|>) prefix >> (evaluateContains contains_value |> falseOnNone)
                     | BinaryOp.AnyOp, any_value -> (|>) prefix >> (evaluateAny comparers any_value |> falseOnNone)
                     | BinaryOp.AllOp, all_value -> (|>) prefix >> (evaluateAll comparers all_value |> falseOnNone)
+                    | BinaryOp.IsOp, all_value -> (|>) prefix >> (evaluateIs comparers all_value |> falseOnNone)
                     | _ -> raise (ParseError "invalid binary matcher")
                 | Empty -> (fun context->true)
         CompileExpression "" exp
         
+    and private evaluateIs (comparers:Map<string,ComparerDelegate>) (leftValue:ComparisonValue) =
+        let eval = parse leftValue |> createEvaluator comparers
+        createNestedContext >> eval
+    
     and private evaluateAny (comparers:Map<string,ComparerDelegate>) (leftValue:ComparisonValue) =
-        let context = fun (value: JsonValue) (name: string) -> match name with
-                                                               | "" -> Some value
-                                                               | _ -> value.TryGetProperty(name)
         let eval = parse leftValue |> createEvaluator comparers
         fun (rightValue:JsonValue) -> match rightValue with
-                                       | Array arr -> Array.exists (fun x-> (context(x)) |> eval ) arr
+                                       | Array arr -> Array.exists (createNestedContext >> eval) arr
                                        | _ -> false
 
     and private evaluateAll (comparers:Map<string,ComparerDelegate>) (leftValue:ComparisonValue) =
-        let context = fun (value: JsonValue) (name: string) -> match name with
-                                                               | "" -> Some value
-                                                               | _ -> value.TryGetProperty(name)
         let eval = parse leftValue |> createEvaluator comparers
         fun (rightValue:JsonValue) -> match rightValue with
-                                       | Array arr -> Array.forall (fun x-> (context(x)) |> eval ) arr
+                                       | Array arr -> Array.forall (createNestedContext >> eval) arr
                                        | _ -> false
         
 module ValueDistribution = 

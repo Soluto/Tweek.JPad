@@ -345,8 +345,8 @@ type ``Matcher tests`` ()=
     member test.``Array comparers - all with comparers``() =
         let devices = JsonValue.Parse """[{"name":"iPhone","AgentVersion":"0.1.1"},{"name":"Samsung","AgentVersion":"0.1.2"}]"""
         let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))])
-        let validate = validatorWithComparers """{"Devices": {"all": {"AgentVersion": {"$compare": "version", "gt": "0.1.0" }} }}""" comparers
-        let validateNotExist = validatorWithComparers """{"Devices": {"all": {"AgentVersion": {"$compare": "version", "$gt": "0.3.0" }} }}""" comparers   
+        let validate = validatorWithComparers """{"Devices": {"$all": {"AgentVersion": {"$compare": "version", "$gt": "0.1.0" }} }}""" comparers
+        let validateNotExist = validatorWithComparers """{"Devices": {"$all": {"AgentVersion": {"$compare": "version", "$gt": "0.3.0" }} }}""" comparers   
         validate (context [("Devices", devices);])  |> should equal true
         validateNotExist (context [("Devices", devices);])  |> should equal false
         
@@ -364,10 +364,34 @@ type ``Matcher tests`` ()=
     
     [<Fact>]
     member test.``Array comparers - invalid comparer format``() =
-        (fun () -> validator """{"Birthdays": {"$any": }}""" |> ignore) |> should throw typeof<Exception>
-        (fun () -> validator """{"Birthdays": {"$any": null}}""" |> ignore) |> should throw typeof<Exception>
-        (fun () -> validator """{"Birthdays": {"$any": { "Date": { "$operatorNotExist":"value" } } }}""" |> ignore) |> should throw typeof<Exception>
+        (fun () -> validator """{"Birthdays": {"$any": { "Date": { "$operatorNotExist":"value" } } }}""" |> ignore) |> should throw typeof<ParseError>
+        (fun () -> validator """{"Birthdays": {"$all": { "Date": { "$operatorNotExist":"value" } } }}""" |> ignore) |> should throw typeof<ParseError>
 
-        (fun () -> validator """{"Birthdays": {"$all": }}""" |> ignore) |> should throw typeof<Exception>
-        (fun () -> validator """{"Birthdays": {"$all": null}}""" |> ignore) |> should throw typeof<Exception>
-        (fun () -> validator """{"Birthdays": {"$all": { "Date": { "$operatorNotExist":"value" } } }}""" |> ignore) |> should throw typeof<Exception>
+    [<Fact>]
+    member test.``Object and Array mix``() =
+       let validate = validator """{
+           "user": {
+                    "$is": {
+                       "friends":{
+                           "$any": {
+                               "address": {
+                                   "$is":{
+                                       "city": "rome"
+                                   }
+                               }
+                           }
+                        }
+                    }
+               }
+           }"""
+       let mix = JsonValue.Parse """{
+            "friends": [
+                {
+                    "Address":{
+                        "city": "Rome"
+                    }
+                }
+             ]
+       }"""
+       validate (context [("user", mix);])  |> should equal true
+       
