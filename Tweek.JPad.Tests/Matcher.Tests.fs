@@ -6,16 +6,13 @@
 
 open FsUnit
 open Xunit
-open FsCheck.Xunit;
 open FSharpUtils.Newtonsoft;
-open Microsoft.FSharp.Reflection;
 open Tweek.JPad;
 open System;
-open Tests.Common
-open FSharpUtils.Newtonsoft
 
 type ``Matcher tests`` ()=
-    let validator jsonString = Matcher.createEvaluator (ParserSettings(defaultSha1Provider)) (jsonString|>JsonValue.Parse|>Matcher.parse)
+    let validator jsonString = Matcher.createEvaluator (dict[]) (jsonString|>JsonValue.Parse|>Matcher.parse)
+    let validatorWithComparers jsonString comparers = Matcher.createEvaluator comparers (jsonString|>JsonValue.Parse|>Matcher.parse)
     let createContext seq  =  fun (name:string) -> seq |> Seq.tryFind (fun (k,v)-> k = name) |> Option.map (fun (k,v)-> v)
     let context = createContext;
 
@@ -58,14 +55,14 @@ type ``Matcher tests`` ()=
     member test.``use custom comparer``() =
         let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))]);
         let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> Matcher.parse;
-        let validate =  Matcher.createEvaluator (ParserSettings(defaultSha1Provider, Comparers=comparers)) matcher;
+        let validate =  Matcher.createEvaluator comparers matcher;
         validate (context [("AgentVersion", JsonValue.String("1.15.1"))]) |> should equal true;
 
     [<Fact>]
     member test.``use custom comparer with broken mismatched target value should fail in compile time``() =
         let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))]);
         let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "debug-1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> Matcher.parse;
-        (fun () ->Matcher.createEvaluator (ParserSettings(defaultSha1Provider, Comparers=comparers)) matcher |> ignore) |> should throw typeof<ParseError>
+        (fun () ->Matcher.createEvaluator comparers matcher |> ignore) |> should throw typeof<ParseError>
 
     [<Fact>]
     member test.``exist/not exist prop support -> expressed with null``() =
@@ -286,3 +283,91 @@ type ``Matcher tests`` ()=
         validate (context [||])  |> should equal false
         validate (context [("Country", JsonValue.Null);])  |> should equal false
         validate (context [("Country", JsonValue.String(null));])  |> should equal false
+        
+    [<Fact>]
+    member test.``Array comparers - any``() =
+        let countries = JsonValue.Parse """[{"name":"IsrAel"},{"name":"Italy"},{"name":"Australia"}]"""
+        let validate = validator """{"Countries": {"$any": { "name": "Italy" } }}"""
+        let validateNotExist = validator """{"Countries": {"$any": { "name": "Spain" } }}"""
+        let validateOp = validator """{"Countries": {"$any": { "name": {"$contains": "ita"} } }}"""
+        let validateOpNotExists = validator """{"Countries": {"$any": { "name": {"$contains": "xxx"} } }}"""
+        let validatePrimitive = validator """{"Countries": {"$any": "Italy" }}"""
+        validate (context [("Countries", countries);])  |> should equal true
+        validateNotExist (context [("Countries", countries);])  |> should equal false
+        validateOp (context [("Countries", countries);])  |> should equal true
+        validateOpNotExists (context [("Countries", countries);])  |> should equal false
+        validatePrimitive (context [("Countries", countries);])  |> should equal false
+        validate (context [("Countries", JsonValue.Array([||]));])  |> should equal false
+        validate (context [("Countries", JsonValue.Null);])  |> should equal false
+        validate (context [("Countries", JsonValue.String(""));])  |> should equal false
+        validate (context [("Countries", JsonValue.Boolean(false));])  |> should equal false
+        
+    [<Fact>]
+    member test.``Array comparers - any with comparers``() =
+        let devices = JsonValue.Parse """[{"name":"iPhone","AgentVersion":"0.1.1"},{"name":"Samsung","AgentVersion":"0.1.0"}]"""
+        let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))])
+        let validate = validatorWithComparers """{"Devices": {"$any": {"AgentVersion": {"$compare": "version", "$gt": "0.1.0" }} }}""" comparers
+        let validateNotExist = validatorWithComparers """{"Devices": {"$any": {"AgentVersion": {"$compare": "version", "$gt": "0.3.0" }} }}""" comparers   
+        validate (context [("Devices", devices);])  |> should equal true
+        validateNotExist (context [("Devices", devices);])  |> should equal false
+        
+    [<Fact>]
+    member test.``Array comparers - any primitives``() =
+        let ages = JsonValue.Parse """[35,40,18]"""
+        let validate = validator """{"Ages": {"$any": 35}}"""
+        let validateNotExist = validator """{"Ages": {"$any": 45}}"""
+        let validateOp = validator """{"Ages": {"$any": { "$gt": 10 }}}"""
+        let validateOpNotExist = validator """{"Ages": {"$any": { "$lt": 10 }}}"""
+        validate (context [("Ages", ages);])  |> should equal true
+        validateNotExist (context [("Ages", ages);])  |> should equal false
+        validateOp (context [("Ages", ages);])  |> should equal true
+        validateOpNotExist (context [("Ages", ages);])  |> should equal false
+
+    [<Fact>]
+    member test.``Array comparers - all``() =
+        let countries = JsonValue.Parse """[{"name":"Canada","countryCode":1},{"name":"US","countryCode":1}]"""
+        let validate = validator """{"Countries": {"$all": { "countryCode":1 } }}"""
+        let validateNotExists = validator """{"Countries": {"$all": { "name": "Canada" } }}"""
+        let validateOp = validator """{"Countries": {"$all": { "countryCode": { "$lt":2, "$gt":0 } } }}"""
+        let validateOpNotExists = validator """{"Countries": {"$all": { "countryCode": { "$lt":1, "$gt":0 } } }}"""
+        let validatePrimitive = validator """{"Countries": { "$all": 1 }}"""
+        validate (context [("Countries", countries);])  |> should equal true
+        validateNotExists (context [("Countries", countries);])  |> should equal false
+        validateOp (context [("Countries", countries);])  |> should equal true
+        validateOpNotExists (context [("Countries", countries);])  |> should equal false
+        validatePrimitive (context [("Countries", countries);])  |> should equal false
+        validate (context [("Countries", JsonValue.Array([||]));])  |> should equal true
+        validate (context [("Countries", JsonValue.Null);])  |> should equal false
+        validate (context [("Countries", JsonValue.String(""));])  |> should equal false
+        validate (context [("Countries", JsonValue.Boolean(false));])  |> should equal false
+
+    [<Fact>]
+    member test.``Array comparers - all with comparers``() =
+        let devices = JsonValue.Parse """[{"name":"iPhone","AgentVersion":"0.1.1"},{"name":"Samsung","AgentVersion":"0.1.2"}]"""
+        let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))])
+        let validate = validatorWithComparers """{"Devices": {"all": {"AgentVersion": {"$compare": "version", "gt": "0.1.0" }} }}""" comparers
+        let validateNotExist = validatorWithComparers """{"Devices": {"all": {"AgentVersion": {"$compare": "version", "$gt": "0.3.0" }} }}""" comparers   
+        validate (context [("Devices", devices);])  |> should equal true
+        validateNotExist (context [("Devices", devices);])  |> should equal false
+        
+    [<Fact>]
+    member test.``Array comparers - all primitives``() =
+        let ages = JsonValue.Parse """[35,35,35]"""
+        let validate = validator """{"Ages": {"$all": 35}}"""
+        let validateNotExist = validator """{"Ages": {"$all": 45}}"""
+        let validateOp = validator """{"Ages": {"$all": { "$gt": 10 }}}"""
+        let validateOpNotExist = validator """{"Ages": {"$all": { "$lt": 10 }}}"""
+        validate (context [("Ages", ages);])  |> should equal true
+        validateNotExist (context [("Ages", ages);])  |> should equal false
+        validateOp (context [("Ages", ages);])  |> should equal true
+        validateOpNotExist (context [("Ages", ages);])  |> should equal false
+    
+    [<Fact>]
+    member test.``Array comparers - invalid comparer format``() =
+        (fun () -> validator """{"Birthdays": {"$any": }}""" |> ignore) |> should throw typeof<Exception>
+        (fun () -> validator """{"Birthdays": {"$any": null}}""" |> ignore) |> should throw typeof<Exception>
+        (fun () -> validator """{"Birthdays": {"$any": { "Date": { "$operatorNotExist":"value" } } }}""" |> ignore) |> should throw typeof<Exception>
+
+        (fun () -> validator """{"Birthdays": {"$all": }}""" |> ignore) |> should throw typeof<Exception>
+        (fun () -> validator """{"Birthdays": {"$all": null}}""" |> ignore) |> should throw typeof<Exception>
+        (fun () -> validator """{"Birthdays": {"$all": { "Date": { "$operatorNotExist":"value" } } }}""" |> ignore) |> should throw typeof<Exception>

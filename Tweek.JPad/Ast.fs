@@ -56,6 +56,8 @@ module AST =
         | CompareOp of CompareOp
         | StringOp of StringOp
         | ContainsOp
+        | AnyOp
+        | AllOp
         | In
         | TimeOp of TimeOp
     and UnaryOp = Not
