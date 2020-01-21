@@ -346,7 +346,7 @@ type ``Matcher tests`` ()=
         let devices = JsonValue.Parse """[{"name":"iPhone","AgentVersion":"0.1.1"},{"name":"Samsung","AgentVersion":"0.1.2"}]"""
         let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))])
         let validate = validatorWithComparers """{"Devices": {"$all": {"AgentVersion": {"$compare": "version", "$gt": "0.1.0" }} }}""" comparers
-        let validateNotExist = validatorWithComparers """{"Devices": {"all": {"AgentVersion": {"$compare": "version", "$gt": "0.3.0" }} }}""" comparers   
+        let validateNotExist = validatorWithComparers """{"Devices": {"$all": {"AgentVersion": {"$compare": "version", "$gt": "0.3.0" }} }}""" comparers   
         validate (context [("Devices", devices);])  |> should equal true
         validateNotExist (context [("Devices", devices);])  |> should equal false
         
