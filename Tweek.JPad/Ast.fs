@@ -26,9 +26,7 @@ module AST =
         | Default
     and MatcherExpression = 
             | Property of PropertyName * MatcherExpression
-            | Not of MatcherExpression
-            | Conjuction of ConjuctionOp * MatcherExpression * MatcherExpression
-            | Binary of BinaryOp * ComparisonType * ComparisonValue
+            | Op of Op
             | Empty
     and ComparisonType = | Auto
                          | Custom of String
@@ -49,14 +47,12 @@ module AST =
     and CompareOp = Equal | GreaterThan | LessThan | GreaterEqual | LessEqual | NotEqual 
     and TimeOp = WithinTime
     and Op = 
-        | BinaryOp of BinaryOp
-        | ConjuctionOp of ConjuctionOp
-        | Not
-    and BinaryOp = 
-        | CompareOp of CompareOp
-        | StringOp of StringOp
-        | In
-        | TimeOp of TimeOp
+        | CompareOp of CompareOp * ComparisonValue * ComparisonType
+        | StringOp of StringOp * String
+        | In of ComparisonValue[] * ComparisonType
+        | TimeOp of TimeOp * TimeSpan
+        | ConjuctionOp of ConjuctionOp * MatcherExpression * MatcherExpression
+        | Not of MatcherExpression
     and UnaryOp = Not
     and StringOp = Contains | StartsWith | EndsWith
     and ComparisonValue = JsonValue

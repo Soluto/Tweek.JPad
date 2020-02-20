@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.6;net461</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <Version Condition="$(appveyor_build_version)!=''">$(appveyor_build_version)</Version>
     <Version Condition="$(appveyor_build_version)==''">0.6.0-development</Version>
     <Company>Soluto</Company>
@@ -16,7 +16,14 @@
   <ItemGroup>
     <Compile Include="Common.fs" />
     <Compile Include="Ast.fs" />
-    <Compile Include="Rule.fs" />
+    <Compile Include="Parsing/Matcher.fs" />
+    <Compile Include="Parsing/ValueDistribution.fs" />
+    <Compile Include="Parsing/Rule.fs" />
+    <Compile Include="Parsing/Tree.fs" />
+    <Compile Include="Compilation/Matcher.fs" />
+    <Compile Include="Compilation/ValueDistribution.fs" />
+    <Compile Include="Compilation/Rule.fs" />
+    <Compile Include="Compilation/Tree.fs" />
     <Compile Include="Parser.fs" />
   </ItemGroup>
   <ItemGroup>
