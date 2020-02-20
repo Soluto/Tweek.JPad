@@ -51,8 +51,10 @@ module AST =
         | StringOp of StringOp * String
         | In of ComparisonValue[] * ComparisonType
         | TimeOp of TimeOp * TimeSpan
+        | ContainsOp of ComparisonValue * ComparisonType
         | ConjuctionOp of ConjuctionOp * MatcherExpression * MatcherExpression
         | Not of MatcherExpression
+
     and UnaryOp = Not
-    and StringOp = Contains | StartsWith | EndsWith
+    and StringOp = StartsWith | EndsWith
     and ComparisonValue = JsonValue

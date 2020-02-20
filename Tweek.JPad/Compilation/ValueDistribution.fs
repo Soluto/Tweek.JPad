@@ -25,10 +25,10 @@ module public ValueDistribution =
 
     let compile (distributionType:DistributionType) =
         let fn = match distributionType with
-        | Uniform array ->  array |> uniformCalc;
-        | Weighted weightedValues ->  weightedCalc weightedValues
-        | Bernouli ratio ->  let percentage = ratio |>floatToWeighted
-                             weightedCalc [|(JsonValue.Boolean(true), percentage);(JsonValue.Boolean(false), (100 - percentage))|];
+                    | Uniform array ->  array |> uniformCalc;
+                    | Weighted weightedValues ->  weightedCalc weightedValues
+                    | Bernouli ratio ->  let percentage = ratio |>floatToWeighted
+                                         weightedCalc [|(Boolean(true), percentage);(Boolean(false), (100 - percentage))|];
         
         (fun (sha1Provider:Sha1Provider) (units : Object[])-> 
             let input = units |> Seq.map string |>  String.concat "."

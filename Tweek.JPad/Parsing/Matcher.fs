@@ -29,7 +29,8 @@ module public Matcher =
         | _ -> ParseError("Invalid time unit") |> raise
 
                                                     
-    let rec private parseOp comparisionType op jsonvalue : MatcherExpression = match op, jsonvalue with
+    let rec private parseOp comparisionType op jsonvalue : MatcherExpression = 
+        match op, jsonvalue with
         |"$not", _ -> Op(Op.Not ((parsePropertySchema And comparisionType jsonvalue)))
         |"$or", _ -> parsePropertySchema Or comparisionType jsonvalue
         |"$and", _ -> parsePropertySchema And comparisionType jsonvalue
@@ -40,7 +41,7 @@ module public Matcher =
         |"$lt", _ -> Op(CompareOp(LessThan, jsonvalue, comparisionType))
         |"$ne", _ -> Op(CompareOp(NotEqual, jsonvalue, comparisionType))
         |"$in", Array a -> Op(In(a, comparisionType))
-        |"$contains", String s -> Op((StringOp(Contains, s)))
+        |"$contains", value -> Op((ContainsOp(value, comparisionType)))
         |"$startsWith", String s -> Op(StringOp(StartsWith, s))
         |"$endsWith", String s -> Op(StringOp(EndsWith, s))
         |"$withinTime", String s -> Op(TimeOp(WithinTime, parseTimeUnit(s)))

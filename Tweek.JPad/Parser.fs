@@ -13,5 +13,4 @@ type public JPadParser(settings:ParserSettings) =
         JsonValue.Parse >>
         Parsing.Tree.parse >>
         Compilation.Tree.compile settings
-    //--
     
