@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>netstandard1.6;netstandard2.0;net461</TargetFrameworks>
     <Version Condition="$(appveyor_build_version)!=''">$(appveyor_build_version)</Version>
     <Version Condition="$(appveyor_build_version)==''">0.6.0-development</Version>
     <Company>Soluto</Company>
