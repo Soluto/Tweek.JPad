@@ -57,9 +57,10 @@ module public Matcher =
                                         |None -> comparisonType
             record |> 
                 filter |>
-                Seq.map (fun (key,innerSchema)-> match key with 
-                    |KeyProperty-> Property(key, innerSchema |> parsePropertySchema And newComparisonType)
-                    |Operator -> parseOp newComparisonType key innerSchema
+                Seq.map (fun (key,innerSchema)-> 
+                     match key with 
+                     |KeyProperty-> Property(key, innerSchema |> parsePropertySchema And newComparisonType)
+                     |Operator -> parseOp newComparisonType key innerSchema
                 ) |> reduceOrElse (fun acc exp-> Op(ConjuctionOp(conjuctionOp, acc, exp))) Empty
         | x -> Op(CompareOp(Equal,x, comparisonType))
 
