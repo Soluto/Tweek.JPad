@@ -13,9 +13,11 @@ open Tweek.JPad;
 open System;
 open Tests.Common
 open FSharpUtils.Newtonsoft
+open Tweek.JPad.Compilation.Matcher
+open Tweek.JPad.Parsing.Matcher
 
 type ``Matcher tests`` ()=
-    let validator jsonString = Matcher.createEvaluator (ParserSettings(defaultSha1Provider)) (jsonString|>JsonValue.Parse|>Matcher.parse)
+    let validator jsonString = compile(ParserSettings(defaultSha1Provider)) (jsonString|>JsonValue.Parse|>parse)
     let createContext seq  =  fun (name:string) -> seq |> Seq.tryFind (fun (k,v)-> k = name) |> Option.map (fun (k,v)-> v)
     let context = createContext;
 
@@ -57,15 +59,15 @@ type ``Matcher tests`` ()=
     [<Fact>]
     member test.``use custom comparer``() =
         let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))]);
-        let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> Matcher.parse;
-        let validate =  Matcher.createEvaluator (ParserSettings(defaultSha1Provider, Comparers=comparers)) matcher;
+        let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> parse;
+        let validate =  compile (ParserSettings(defaultSha1Provider, Comparers=comparers)) matcher;
         validate (context [("AgentVersion", JsonValue.String("1.15.1"))]) |> should equal true;
 
     [<Fact>]
     member test.``use custom comparer with broken mismatched target value should fail in compile time``() =
         let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))]);
-        let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "debug-1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> Matcher.parse;
-        (fun () ->Matcher.createEvaluator (ParserSettings(defaultSha1Provider, Comparers=comparers)) matcher |> ignore) |> should throw typeof<ParseError>
+        let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "debug-1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> parse;
+        (fun () ->compile (ParserSettings(defaultSha1Provider, Comparers=comparers)) matcher |> ignore) |> should throw typeof<ParseError>
 
     [<Fact>]
     member test.``exist/not exist prop support -> expressed with null``() =
@@ -207,9 +209,9 @@ type ``Matcher tests`` ()=
 
     [<Fact>]
     member test.``DateCompare using withinTime with invalid time unit format``() =
-        (fun () -> validator """{"Birthday": {"$withinTime": "10z"}}""" |> ignore) |> should throw typeof<Exception>
-        (fun () -> validator """{"Birthday": {"$withinTime": null}}""" |> ignore) |> should throw typeof<Exception>
-        (fun () -> validator """{"Birthday": {"$withinTime": "a long long time ago"}}""" |> ignore) |> should throw typeof<Exception>
+        (fun () -> validator """{"Birthday": {"$withinTime": "10z"}}""" |> ignore) |> should throw typeof<ParseError>
+        (fun () -> validator """{"Birthday": {"$withinTime": null}}""" |> ignore) |> should throw typeof<ParseError>
+        (fun () -> validator """{"Birthday": {"$withinTime": "a long long time ago"}}""" |> ignore) |> should throw typeof<ParseError>
 
     [<Fact>]
     member test.``DateCompare with string comparer``() =
