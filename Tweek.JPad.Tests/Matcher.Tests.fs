@@ -9,10 +9,14 @@ open Xunit
 open FSharpUtils.Newtonsoft;
 open Tweek.JPad;
 open System;
+open Tests.Common
+open Tweek.JPad.Compilation.Matcher
+open Tweek.JPad.Parsing.Matcher
 
 type ``Matcher tests`` ()=
-    let validator jsonString = Matcher.createEvaluator (dict[]) (jsonString|>JsonValue.Parse|>Matcher.parse)
-    let validatorWithComparers jsonString comparers = Matcher.createEvaluator comparers (jsonString|>JsonValue.Parse|>Matcher.parse)
+    let validator jsonString = compile (dict[]) (jsonString|>JsonValue.Parse|>parse)
+    let validatorWithComparers jsonString comparers = compile comparers (jsonString|>JsonValue.Parse|>parse)
+
     let createContext seq  =  fun (name:string) -> seq |> Seq.tryFind (fun (k,v)-> k = name) |> Option.map (fun (k,v)-> v)
     let context = createContext;
 
@@ -54,15 +58,15 @@ type ``Matcher tests`` ()=
     [<Fact>]
     member test.``use custom comparer``() =
         let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))]);
-        let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> Matcher.parse;
-        let validate =  Matcher.createEvaluator comparers matcher;
+        let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> parse;
+        let validate =  compile comparers matcher;
         validate (context [("AgentVersion", JsonValue.String("1.15.1"))]) |> should equal true;
 
     [<Fact>]
     member test.``use custom comparer with broken mismatched target value should fail in compile time``() =
         let comparers = dict([("version", new ComparerDelegate(fun x -> Version.Parse(x) :> IComparable))]);
-        let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "debug-1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> Matcher.parse;
-        (fun () ->Matcher.createEvaluator comparers matcher |> ignore) |> should throw typeof<ParseError>
+        let matcher = """{"AgentVersion": {"$compare": "version", "$gt": "debug-1.5.1", "$le": "1.15.2" }}""" |> JsonValue.Parse |> parse;
+        (fun () ->compile comparers matcher |> ignore) |> should throw typeof<ParseError>
 
     [<Fact>]
     member test.``exist/not exist prop support -> expressed with null``() =
@@ -204,9 +208,9 @@ type ``Matcher tests`` ()=
 
     [<Fact>]
     member test.``DateCompare using withinTime with invalid time unit format``() =
-        (fun () -> validator """{"Birthday": {"$withinTime": "10z"}}""" |> ignore) |> should throw typeof<Exception>
-        (fun () -> validator """{"Birthday": {"$withinTime": null}}""" |> ignore) |> should throw typeof<Exception>
-        (fun () -> validator """{"Birthday": {"$withinTime": "a long long time ago"}}""" |> ignore) |> should throw typeof<Exception>
+        (fun () -> validator """{"Birthday": {"$withinTime": "10z"}}""" |> ignore) |> should throw typeof<ParseError>
+        (fun () -> validator """{"Birthday": {"$withinTime": null}}""" |> ignore) |> should throw typeof<ParseError>
+        (fun () -> validator """{"Birthday": {"$withinTime": "a long long time ago"}}""" |> ignore) |> should throw typeof<ParseError>
 
     [<Fact>]
     member test.``DateCompare with string comparer``() =
@@ -335,11 +339,11 @@ type ``Matcher tests`` ()=
         validateNotExists (context [("Countries", countries);])  |> should equal false
         validateOp (context [("Countries", countries);])  |> should equal true
         validateOpNotExists (context [("Countries", countries);])  |> should equal false
-        validatePrimitive (context [("Countries", countries);])  |> should equal false
         validate (context [("Countries", JsonValue.Array([||]));])  |> should equal true
         validate (context [("Countries", JsonValue.Null);])  |> should equal false
         validate (context [("Countries", JsonValue.String(""));])  |> should equal false
         validate (context [("Countries", JsonValue.Boolean(false));])  |> should equal false
+        (fun ()-> validatePrimitive (context [("Countries", countries);]) |> ignore) |> should throw typeof<Exception>
 
     [<Fact>]
     member test.``Array comparers - all with comparers``() =
