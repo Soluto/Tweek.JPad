@@ -75,7 +75,7 @@ module public Matcher =
                             | Float x, _ ,Float y -> evaluateComparisonOp op x y
                             | Float x, _ ,Number y -> evaluateComparisonOp op (decimal x) y
                             | Float x, _ ,String y -> float y |> evaluateComparisonOp op x
-                            | _ , _ , _ -> Exception("non matching types") |> raise
+                            | _ , _ , _ -> false
                         )
 
     let private evaluateStringComparison (op: StringOp) (leftValue:string) =
