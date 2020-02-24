@@ -13,8 +13,8 @@ module public Tree =
                                          |> Option.defaultValue (RulesList [])
                     let map = r |> Seq.filter (fst >> (<>) "*") |> Seq.map (fun (k,v) -> ((k.ToLower()), (parseRulesContainer valueType other v))) |> Map.ofSeq
                     RulesByPartition (partition, map, defaultValue)
-                | String s, partition::other -> 
-                        RulesByPartition (partition, Map.empty, (parseRulesContainer valueType other (String s) ))
+                | value, partition::other -> 
+                        RulesByPartition (partition, Map.empty, (parseRulesContainer valueType other value ))
                 
     let parse (json:JsonValue) : JPad =
         match json with
