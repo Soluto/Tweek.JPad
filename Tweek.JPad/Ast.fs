@@ -5,25 +5,17 @@ open FSharpUtils.Newtonsoft;
 
 module AST = 
     type JPad = {
-        Partitions:Partitions
         Rules: RulesContainer
         ValueType: string
         DefaultValue: JsonValue option
     }
     and Partitions = string[]
+    and DefaultPartition = RulesContainer
+    and PartitionProperty = string
     and RulesContainer = 
-        | RulesByPartition of PatternBlock[]
+        | RulesByPartition of PartitionProperty * Map<string,RulesContainer> * DefaultPartition
         | RulesList of (MatcherExpression * RuleValue) list
-    and PatternBlock =
-        | Map of Map<string,RulesContainer>
-        | Patterns of (Pattern * RulesContainer) list
-        | Default of RulesContainer
     and RuleSimpleValue = JsonValue
-    and Pattern = string
-    and PatternType = 
-        | Exact
-        | Pattern
-        | Default
     and MatcherExpression = 
             | Property of PropertyName * MatcherExpression
             | Op of Op

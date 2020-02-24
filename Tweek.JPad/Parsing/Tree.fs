@@ -4,43 +4,32 @@ open FSharpUtils.Newtonsoft
 open Tweek.JPad
 
 module public Tree = 
-    let private parsePatternType (input:string) = if input = "*" then PatternType.Default else PatternType.Exact
-    
-    let rec private parsePatternBlock depth pattern (rulesData:(string * JsonValue)[]) valueType : PatternBlock =
-            match pattern with
-                | Exact -> 
-                    rulesData |> 
-                    Array.map (fun (partitionValue,rules) -> (partitionValue.ToLower(), parseRulesContainer (depth - 1) rules valueType) ) |>
-                    Map.ofArray |>
-                    Map
-                | Default -> parseRulesContainer (depth - 1) (snd rulesData.[0]) valueType |> PatternBlock.Default      
-                | Pattern -> raise (ParseError("complex patterns are not supported yet"))
-    
-    and private parseRulesContainer (depth) (rulesData:JsonValue) valueType : RulesContainer =
-            match (rulesData) with
-                | Array rules when (depth = 0) -> rules |> List.ofArray |> List.map (Rule.parse valueType) |> RulesList
-                | value when (depth = 0) -> RulesList [(Empty, SingleVariant(value))]
-                | Record r when (depth > 0) -> 
-                    r |> Array.groupBy (fst >> parsePatternType) |>
-                    Array.map (fun (patternType,data) -> parsePatternBlock depth patternType data valueType) |>
-                    RulesByPartition
-                | String s when (depth > 0) -> [|parsePatternBlock depth Default [|("*",String(s))|] valueType|]  |>
-                                                         RulesByPartition
+    let rec private parseRulesContainer valueType (partitions:List<string>) (rulesData:JsonValue)  : RulesContainer =
+            match (rulesData, partitions) with
+                | Array rules, [] -> rules |> List.ofArray |> List.map (Rule.parse valueType) |> RulesList
+                | value, [] -> RulesList [(Empty, SingleVariant(value))]
+                | Record r, partition::other -> 
+                    let defaultValue = r |> Array.tryFind (fst >> (=) "*") |> Option.map (fun (_,v)-> parseRulesContainer valueType other v)
+                                         |> Option.defaultValue (RulesList [])
+                    let map = r |> Seq.filter (fst >> (<>) "*") |> Seq.map (fun (k,v) -> ((k.ToLower()), (parseRulesContainer valueType other v))) |> Map.ofSeq
+                    RulesByPartition (partition, map, defaultValue)
+                | String s, partition::other -> 
+                        RulesByPartition (partition, Map.empty, (parseRulesContainer valueType other (String s) ))
                 
-    and parse (json:JsonValue) : JPad =
+    let parse (json:JsonValue) : JPad =
         match json with
         | Record r->
-            let partitions = (json.GetProperty "partitions") |> JsonExtensions.AsArray |> Array.map JsonExtensions.AsString;
+            let partitions = (json.GetProperty "partitions") |> JsonExtensions.AsArray |> Seq.map JsonExtensions.AsString |> List.ofSeq;
             let rules = (json.GetProperty "rules");
             let valueType = defaultArg (json.TryGetProperty "valueType" |> Option.map JsonExtensions.AsString) "string"
             let defaultValue = json.TryGetProperty "defaultValue"
 
-            { Partitions = partitions;
-              Rules = parseRulesContainer partitions.Length rules valueType
+            { 
+              Rules = parseRulesContainer valueType partitions rules
               ValueType = valueType
               DefaultValue = defaultValue
               } 
         | Array jpad1rules -> jpad1rules |> List.ofArray |>
                                         List.map (Rule.parse "string") |>
                                         RulesList |>
-                                        (fun rules->{Partitions = [||]; Rules = rules; ValueType = "string"; DefaultValue = None})
+                                        (fun rules->{Rules = rules; ValueType = "string"; DefaultValue = None})
