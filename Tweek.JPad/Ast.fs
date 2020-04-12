@@ -38,6 +38,7 @@ module AST =
     and ConjuctionOp = And | Or 
     and CompareOp = Equal | GreaterThan | LessThan | GreaterEqual | LessEqual | NotEqual 
     and TimeOp = WithinTime
+    and NestedOp = All | Is | Any
     and Op = 
         | CompareOp of CompareOp * ComparisonValue * ComparisonType
         | StringOp of StringOp * String
@@ -46,7 +47,7 @@ module AST =
         | ContainsOp of ComparisonValue * ComparisonType
         | ConjuctionOp of ConjuctionOp * MatcherExpression * MatcherExpression
         | Not of MatcherExpression
+        | NestedOp of NestedOp * MatcherExpression
 
-    and UnaryOp = Not
     and StringOp = StartsWith | EndsWith
     and ComparisonValue = JsonValue

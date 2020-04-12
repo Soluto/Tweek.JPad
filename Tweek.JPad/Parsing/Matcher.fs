@@ -45,6 +45,9 @@ module public Matcher =
         |"$startsWith", String s -> Op(StringOp(StartsWith, s))
         |"$endsWith", String s -> Op(StringOp(EndsWith, s))
         |"$withinTime", String s -> Op(TimeOp(WithinTime, parseTimeUnit(s)))
+        |"$is", _ -> Op(NestedOp(Is,parsePropertySchema And comparisionType jsonvalue))
+        |"$any", _ -> Op(NestedOp(Any,parsePropertySchema And comparisionType jsonvalue))
+        |"$all", _ -> Op(NestedOp(All,parsePropertySchema And comparisionType jsonvalue))
         | s, _ -> raise (ParseError("expected operator, found:"+s))
 
     and private parsePropertySchema (conjuctionOp : ConjuctionOp)  (comparisonType:ComparisonType) (schema:JsonValue)  : MatcherExpression = 

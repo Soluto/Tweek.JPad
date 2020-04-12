@@ -22,6 +22,10 @@ module public Matcher =
     
     let private getPropName prefix prop = if prefix = "" then prop else (prefix + "." + prop)
 
+    let private createNestedContext (value: JsonValue) (name: string) = match name with
+                                                                           | "" -> Some value
+                                                                           | _ -> value.Properties() |> Array.tryFind (fun (p, _)->StringComparer.OrdinalIgnoreCase.Compare(p, name) = 0) |> Option.map snd
+
     let private parseTime (valueOption:Option<JsonValue>) = 
         match valueOption with
         | None -> None
@@ -71,7 +75,7 @@ module public Matcher =
                             | Float x, _ ,Float y -> evaluateComparisonOp op x y
                             | Float x, _ ,Number y -> evaluateComparisonOp op (decimal x) y
                             | Float x, _ ,String y -> float y |> evaluateComparisonOp op x
-                            | _ , _ , _ -> Exception("non matching types") |> raise
+                            | _ , _ , _ -> false
                         )
 
     let private evaluateStringComparison (op: StringOp) (leftValue:string) =
@@ -116,7 +120,7 @@ module public Matcher =
                     | Property (prop, innerexp) -> CompileExpression (getPropName prefix prop) innerexp 
                     | Op o -> 
                         match o with
-                        | Op.Not (innerexp) -> CompileExpression prefix innerexp >> not
+                        | Not (innerexp) -> CompileExpression prefix innerexp >> not
                         | ConjuctionOp (op, l, r)->
                             let lExp = CompileExpression prefix l;
                             let rExp = CompileExpression prefix r;
@@ -128,12 +132,21 @@ module public Matcher =
                         | TimeOp (op, value) -> evaluateTimeComparison prefix op value
                         | StringOp (op, value) -> (|>) prefix >> Option.map JsonExtensions.AsString >> evaluateStringComparison op value
                         | ContainsOp (value, newComparisonType) -> (|>) prefix >> (evaluateContains (getComparer newComparisonType) value |> falseOnNone) 
+                        | NestedOp (op, innerexp) -> 
+                            let eval = CompileExpression "" innerexp
+                            (|>) prefix >> 
+                            ((fun r->
+                                match op, r with
+                                | Is,_ -> (createNestedContext r) |> eval 
+                                | Any, Array arr -> arr |> Array.exists (createNestedContext >> eval )
+                                | All, Array arr -> arr |> Array.forall (createNestedContext >> eval )
+                                | _, _ -> false
+                            )|> falseOnNone)
                     | Empty -> (fun context->true)
 
             
             CompileExpression "" exp
 
-    let compile (settings: ParserSettings) (matcher: MatcherExpression) =
-        //settings.Comparers
-        let comparersMaps = (settings.Comparers |> toMap).Add("date", new ComparerDelegate(fun x -> DateTime.Parse(x) :> IComparable))
+    let compile (comparers: System.Collections.Generic.IDictionary<string,ComparerDelegate>)  (matcher: MatcherExpression) =
+        let comparersMaps = (comparers |> toMap).Add("date", new ComparerDelegate(fun x -> DateTime.Parse(x) :> IComparable))
         (matcher |> (compile_internal comparersMaps))

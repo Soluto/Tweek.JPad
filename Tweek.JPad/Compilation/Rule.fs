@@ -6,7 +6,7 @@ open Tweek.JPad
 
 module public Rule = 
     let compile (settings:ParserSettings) (rule : (MatcherExpression * RuleValue)) : JPadEvaluate =
-        let matcher = Matcher.compile settings (fst rule);
+        let matcher = Matcher.compile settings.Comparers (fst rule);
         let validateMatcher context = if (matcher context) then Some(context) else None;  
         match (snd rule) with
             |SingleVariant value -> validateMatcher >> Option.map (fun _ -> value);
