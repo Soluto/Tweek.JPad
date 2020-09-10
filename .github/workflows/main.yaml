@@ -1,0 +1,28 @@
+name: Main
+
+on: push
+
+jobs:
+  test_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Run tests
+        run: |
+          dotnet restore
+          dotnet test
+        working-directory: Tweek.JPad.Tests
+
+      - name: Build package
+        run: package_version=0.8.$GITHUB_RUN_NUMBER dotnet build -c Release
+        working-directory: Tweek.JPad
+
+
+      - name: Publish package
+        if: ${{ github.ref == 'refs/heads/master' }}
+        env:
+          NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
+        run: |
+          dotnet nuget push ./bin/Release/Tweek.JPad\*.nupkg -s nuget.org -k $NUGET_APIKEY
+        working-directory: Tweek.JPad
