@@ -1,3 +1,3 @@
-# Tweek.JPad ![build status](https://ci.appveyor.com/api/projects/status/f30lr45si9otps4i?svg=true)
+# Tweek.JPad ![build status](https://github.com/Soluto/Tweek.JPad/workflows/Main/badge.svg)
 
 JPad is the default rules engine for Tweek.
