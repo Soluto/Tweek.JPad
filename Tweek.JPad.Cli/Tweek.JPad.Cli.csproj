@@ -10,6 +10,6 @@
     <PackageReference Include="LanguageExt.Core" Version="2.1.32" />
     <PackageReference Include="LanguageExt.FSharp" Version="2.1.32" />
     <PackageReference Include="Microsoft.Extensions.CommandLineUtils" Version="1.1.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 </Project>
